@@ -1,6 +1,4 @@
-; ;;;;;;;;;;;;
-; Vars
-; ;;;;;;;;;;;;
+                    #CaseOn
 
 PWCLK               equ       $0840               ; Clk
 PWEN                equ       $0842               ; Enable
@@ -28,165 +26,180 @@ DelayG              equ       1020
 DelayA              equ       909
 DelayB              equ       810
 
+;*******************************************************************************
+                    #RAM
+;*******************************************************************************
                     org       $2000
-Note                rmb       2
-Sample              rmb       2
-Buffer              rmb       2
 
-; ;;;;;;;;;;
-; Main
-; ;;;;;;;;;;
+note                rmb       2
+sample              rmb       2
+buffer              rmb       2
 
+;*******************************************************************************
+                    #ROM
+;*******************************************************************************
                     org       $1000
-Start
+
+Start               proc
                     cli
                     ldd       #SinWave
-                    std       Buffer
+                    std       buffer
                     bsr       InitTimer
                     bsr       InitPWM
                     bsr       SelectRow
-Loop                bsr       CheckCol
-                    bra       Loop
+Loop@@              bsr       CheckCol
+                    bra       Loop@@
 
-; ;;;;;;;;;;
-; Subs
-; ;;;;;;;;;;
+;*******************************************************************************
 
-
-InitTimer           lda       #$02                ; TC1 Timer
+InitTimer           proc
+                    lda       #$02                ; TC1 Timer
                     sta       TIOS
                     lda       #$80                ; Enable Timer
                     sta       TSCR
                     rts
 
-InitPWM             clr       PWCLK
+;*******************************************************************************
+
+InitPWM             proc
+                    clr       PWCLK
                     lda       PWCTL
                     ora       #$08
                     sta       PWCTL
                     rts
 
-PlayC               ldd       #DelayC             ; load delay time
-                    std       Note
-                    bsr       StartNote
-                    rts
+;*******************************************************************************
 
-PlayD               ldd       #DelayD             ; load delay time
-                    std       Note
-                    bsr       StartNote
-                    rts
+PlayC               proc
+                    ldd       #DelayC             ; load delay time
+                    bra       StartNote
 
-PlayE               ldd       #DelayE             ; load delay time
-                    std       Note
-                    bsr       StartNote
-                    rts
+;*******************************************************************************
 
-StartNote           ldx       Buffer              ; Set to begging of buffer
-                    lda       1,x                 ; load sample
+PlayD               proc
+                    ldd       #DelayD             ; load delay time
+                    bra       StartNote
+
+;*******************************************************************************
+
+PlayE               proc
+                    ldd       #DelayE             ; load delay time
+;                   bra       StartNote
+
+;*******************************************************************************
+
+StartNote           proc
+                    std       note
+                    ldx       buffer              ; Set to begging of buffer
                     inx
+                    lda       ,x                  ; load sample
                     sta       PWDTY0              ; store sample to PWM Duty
-                    stx       Sample              ; Store inc to sample
+                    stx       sample              ; Store inc to sample
                     ldd       TCNT
-                    addd      Note
+                    addd      note
                     std       TC1                 ; Set 1/20 C Period
                     lda       #$A0
                     sta       PWPER0              ; Set period
-
                     lda       #$02                ; Enable Interuppt
                     sta       TMSK1
                     lda       #$01                ; Enable PWM
                     sta       PWEN
                     rts
 
-StopNote            pshd
-                    lda       #$00
+;*******************************************************************************
+
+StopNote            proc
+                    psha
+                    clra
                     sta       TMSK1
-                    lda       #$00
                     sta       PWEN
-                    puld
+                    pula
                     rts
 
+;*******************************************************************************
 ; Checks Rows
-SelectRow           psha
+
+SelectRow           proc
+                    psha
                     lda       #$10
                     sta       DDRH
                     sta       PORTH
-SelectRowRTS        pula
+                    pula
                     rts
 
+;*******************************************************************************
 ; Checks Cols
-CheckCol            psha
+
+CheckCol            proc
+                    psha
                     pshx
                     pshb
-                    ldx       #0                  ; Init to 0
+                    clrx                          ; Init to 0
                     lda       PORTH               ; load port
                     anda      #$0F                ; mask MSBs
-                    beq       CheckColRTS         ; Exit if none set
+                    beq       Done@@              ; Exit if none set
                     bita      #$01
-                    beq       Act1
+                    beq       _1@@
                     bita      #$02
-                    beq       Act2
+                    beq       _2@@
                     bita      #$04
-                    beq       Act3
+                    beq       _3@@
                     bita      #$08
-                    beq       Act4
-                    bra       CheckColRTS
-
-Act1                bsr       PlayC
-A1_LOOP             ldb       PORTH
+                    beq       _4@@
+                    bra       Done@@
+          ;--------------------------------------
+_1@@                bsr       PlayC
+Loop1@@             ldb       PORTH
                     andb      #$01
-                    bne       A1_LOOP
+                    bne       Loop1@@
                     bsr       StopNote
-                    bra       CheckColRTS
-
-Act2                bsr       PlayD
-A2_LOOP             ldb       PORTH
+                    bra       Done@@
+          ;--------------------------------------
+_2@@                bsr       PlayD
+Loop2@@             ldb       PORTH
                     andb      #$02
-                    bne       A2_LOOP
+                    bne       Loop2@@
                     bsr       StopNote
-                    bra       CheckColRTS
-
-Act3                jsr       PlayE
-A3_LOOP             ldb       PORTH
+                    bra       Done@@
+          ;--------------------------------------
+_3@@                bsr       PlayE
+Loop3@@             ldb       PORTH
                     andb      #$04
-                    bne       A3_LOOP
+                    bne       Loop3@@
                     bsr       StopNote
-                    bra       CheckColRTS
-
-Act4                ldd       Buffer
+                    bra       Done@@
+          ;--------------------------------------
+_4@@                ldd       buffer
                     anda      #]SinWave
                     andb      #[SinWave
                     cmpd      #0
-                    bne       Sine
+                    bne       Sine@@
                     ldd       #TriWave
-                    bra       CheckCol1
-
-Sine                ldd       #SinWave
-
-CheckCol1           std       Buffer
-CheckColRTS         pulb
+                    bra       _5@@
+Sine@@              ldd       #SinWave
+_5@@                std       buffer
+Done@@              pulb
                     pulx
                     pula
                     rts
 
-; ;;;;;;;;;;;
-; ISRs
-; ;;;;;;;;;;;
+;*******************************************************************************
 
-ISR_Timer           pshd
+ISR_Timer           proc
+                    pshd
                     pshx
                     ldd       TCNT                ; Get Current value
-                    addd      Note                ; Add delay
+                    addd      note                ; Add delay
                     std       TC1                 ; Store delay
                     lda       #$02                ; Reset Flag
                     sta       TFLG1
-                    ldx       Sample              ; Load Current Sample addr
+                    ldx       sample              ; Load Current Sample addr
                     lda       1,x                 ; Load sample value inc
-                    bne       ISR_Timer1          ; if sample is zero restart buffer
-                    ldx       Buffer
+                    bne       _1@@                ; if sample is zero restart buffer
+                    ldx       buffer
                     lda       1,x
-ISR_Timer1
-                    inx
-                    stx       Sample              ; Store current sample addr
+_1@@                inx
+                    stx       sample              ; Store current sample addr
                     sta       PWDTY0              ; Set Duty Cycle
                     clr       PWCNT0              ; Reset PWM
                     cli
@@ -194,8 +207,12 @@ ISR_Timer1
                     puld
                     rti
 
+;*******************************************************************************
+
                     org       $62c
                     fdb       ISR_Timer
+
+;*******************************************************************************
 
                     org       $2010
 

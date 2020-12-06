@@ -1,42 +1,52 @@
-; ;;;;;;;;;;
-; interrupt test
-; ;;;;;;
+;*******************************************************************************
+; Interrupt test
+;*******************************************************************************
 
-; variables and equates
 PORTC               equ       $1003
 DDRC                equ       $1007
 TMSK2               equ       $1024
 TCNT                equ       $100E
 TFLG2               equ       $1025
 
-                    org       $D000
-; main
-Init
-                    lds       #$01FF
-                    bsr       init_ports
-                    bsr       init_interrupts
-Main
-                    bra       Main
+ROM                 equ       $D000
+STACKTOP            equ       $01FF
 
+Vtovf               equ       $FFDE
+Vreset              equ       $FFFE
 
-; subroutines
-init_ports
-; set 3rd bit in data direction register for port c to output
+;*******************************************************************************
+                    #ROM
+;*******************************************************************************
+                    org       ROM
+
+Start               proc
+                    lds       #STACKTOP
+                    bsr       InitPorts
+                    bsr       InitInterrupts
+                    bra       *
+
+;*******************************************************************************
+
+InitPorts           proc
+          ;-------------------------------------- ; set 3rd bit in data direction register for port c to output
                     lda       #$08
                     sta       DDRC
-; reset bit 3 to 0 => LED off
-                    lda       #$00
-                    sta       PORTC
+          ;-------------------------------------- ; reset bit 3 to 0 => LED off
+                    clr       PORTC
                     rts
 
-init_interrupts
+;*******************************************************************************
+
+InitInterrupts      proc
                     lda       #$80                ; enable timer overflow interrupt
                     sta       TMSK2
                     cli                           ; clear the global interrupt mask
                     rts
 
+;*******************************************************************************
 ; Interrupt Service Routines
-ISR_TimerOverflow
+
+TOV_Handler         proc
                     lda       PORTC
                     eora      #$08
                     sta       PORTC
@@ -44,11 +54,12 @@ ISR_TimerOverflow
                     sta       TFLG2
                     rti
 
+;*******************************************************************************
+                    #VECTORS
+;*******************************************************************************
 
-; interrupt vectors
-                    org       $FFDE
-                    dw        ISR_TimerOverflow
+                    org       Vtovf
+                    dw        TOV_Handler
 
-
-                    org       $FFFE
-                    dw        Init
+                    org       Vreset
+                    dw        Start

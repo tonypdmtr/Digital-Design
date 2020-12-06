@@ -1,35 +1,46 @@
-; hex to decimal converter
+;*******************************************************************************
+; Hex to decimal converter
+;*******************************************************************************
 
-decimal             equ       $0000
-hex                 equ       $0001
+STACKTOP            equ       $01FF
+ROM                 equ       $D000
 
+;*******************************************************************************
+                    #RAM
+;*******************************************************************************
 
-                    org       $D000
-; main
-Init
+decimal             rmb       1
+hex                 rmb       1
+
+;*******************************************************************************
+                    #ROM
+;*******************************************************************************
+                    org       ROM
+
+Start               proc
                     clr       decimal
                     clr       hex
-                    lds       $01FF
-Main
-                    bsr       Hex2Dec
-                    bra       Main
+                    lds       #STACKTOP
+Loop@@              bsr       Hex2Dec
+                    bra       Loop@@
 
-; subroutines
-Hex2Dec
-                    ldx       #$000A
+;*******************************************************************************
+
+Hex2Dec             proc
+                    ldx       #10
                     clra
                     ldb       hex
                     idiv                          ; divide hex by 10 (0A)
                     stb       decimal
                     xgdx                          ; swap x and d because we can't move x directly to decimal
-                    lslb
-                    lslb
-                    lslb
-                    lslb                          ; move most significant byte over
+                    lslb:4                        ; move most significant byte over
                     addb      decimal             ; combine the bytes
                     stb       decimal
                     rts
 
-; interrupt vectors
+;*******************************************************************************
+                    #VECTORS
+;*******************************************************************************
+
                     org       $FFFE
-                    dw        Init
+                    dw        Start

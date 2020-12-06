@@ -1,87 +1,90 @@
-; =============
-; = Variables =
-; =============
-ADCTL               equ       $1030
-ADR2                equ       $1032
-OPTION              equ       $1039
-SCCR2               equ       $102D
-SCSR                equ       $102E
-SCDR                equ       $102F
-BAUD                equ       $102B
-R_H                 equ       $5
+                    #CaseOn
 
-Dig5                equ       $0000
-Dot                 equ       $0001
-Dig4                equ       $0002
-Dig3                equ       $0003
-Dig2                equ       $0004
-Dig1                equ       $0005
-Space               equ       $0006
-Unit                equ       $0007
-CR                  equ       $0008
-LF                  equ       $0009
-Finish              equ       $000A
+REGS                def       $1000
+ADCTL               equ       REGS+$30
+ADR2                equ       REGS+$32
+OPTION              equ       REGS+$39
+SCCR2               equ       REGS+$2D
+SCSR                equ       REGS+$2E
+SCDR                equ       REGS+$2F
+BAUD                equ       REGS+$2B
 
-ADResult            equ       $000B
-; reference Resistor / 4 = 250 ohms
-Rref                equ       $FA
-; ========
-; = Main =
-; ========
+R_REF               equ       $FA                 ; reference Resistor / 4 = 250 ohms
+R_H                 equ       5
+CR                  equ       13
+LF                  equ       10
+
+;*******************************************************************************
+                    #RAM
+;*******************************************************************************
+
+dig5                rmb       1
+dot                 rmb       1
+dig4                rmb       1
+dig3                rmb       1
+dig2                rmb       1
+dig1                rmb       1
+space               rmb       1
+unit                rmb       1
+cr                  rmb       1
+lf                  rmb       1
+finish              rmb       1
+adresult            rmb       1
+
+;*******************************************************************************
+                    #ROM
+;*******************************************************************************
                     org       $B600               ; $E000 w/o Buffalo, $2000 with.
 
-Init                lds       #$01FF              ; initiate stack pointer
+Start               proc
+                    lds       #$01FF              ; initiate stack pointer
                     bsr       SCI_INIT
                     lda       OPTION              ; enable A/D subsystem
                     ora       #$80
                     sta       OPTION
-                    lda       #$2E                ; set some ascii constants
-                    sta       Dot
-                    lda       #$00
-                    sta       Finish
-                    lda       #$0A
-                    sta       LF
-                    lda       #$0D
-                    sta       CR
-                    lda       #$20
-                    sta       Space
+                    lda       #'.'                ; set some ASCII constants
+                    sta       dot
+                    clr       finish
+                    lda       #LF
+                    sta       lf
+                    lda       #CR
+                    sta       cr
+                    lda       #' '
+                    sta       space
+;                   bra       Mode1               ; go to voltmeter by default
 
-Main               ;bra       Mode1               ; go to voltmeter by default
+;*******************************************************************************
 
-Mode1
-                    ldx       #Voltage
+Mode1               proc
+Loop@@              ldx       #MsgVoltage@@
                     bsr       Output
-                    lda       #$56                ; get V for unit
-                    sta       Unit
-Mode11
-                    bsr       Read_AD             ; get value from A/D
-                    jsr       Fill_Digits         ; do the math and save digits
-                    ldx       #Dig5               ; load address to first digit into x
+                    lda       #'V'                ; get V for unit
+                    sta       unit
+_1@@                bsr       Read_AD             ; get value from A/D
+                    jsr       FillDigits          ; do the math and save digits
+                    ldx       #dig5               ; load address to first digit into x
                     bsr       Output              ; output that sequence
                     bsr       Check_Input         ; check for mode change
-                    cmpa      #$6F                ; check for lowercase o
-                    beq       Mode2               ; if we have an o, move to mode 2
-                    bra       Mode11              ; else stay in mode1
-
-Mode2
-                    ldx       #Resistance
+                    cmpa      #'o'                ; check for lowercase o
+                    bne       _1@@                ; if we have an o, move to mode 2 else stay in mode1
+                    ldx       #MsgResistance@@
                     bsr       Output
-                    lda       #$4F                ; get V for unit
-                    sta       Unit
-Mode22
-                    bsr       Read_AD             ; get value from A/D
-;        jsr     Calc_Res       * calculate resistance
+                    lda       #'O'                ; get V for unit
+                    sta       unit
+_2@@                bsr       Read_AD             ; get value from A/D
+;                   jsr       Calc_Res            ; calculate resistance
                     bsr       Check_Input         ; check for mode change
-                    cmpa      #$76                ; check for v and switch mode if found
-                    beq       Mode1
-                    bra       Mode22
+                    cmpa      #'v'                ; check for v and switch mode if found
+                    beq       Loop@@
+                    bra       _2@@
 
-; ========
-; = Subs =
-; ========
+MsgVoltage@@        fcs       CR,'Voltage:    '
+MsgResistance@@     fcs       CR,'Resistance: '
 
-; *Init SCI
-SCI_INIT
+;*******************************************************************************
+; Init SCI
+
+SCI_INIT            proc
                     psha
                     lda       #$0C                ; enable Tx and Rx
                     sta       SCCR2
@@ -90,122 +93,134 @@ SCI_INIT
                     pula
                     rts
 
+;*******************************************************************************
 ; returns either 0 or character in {A}
-Check_Input
+
+Check_Input         proc
                     lda       SCSR                ; check to see if there is data incoming from the SCI
                     anda      #$20
-                    beq       Check_Input_End     ; if not, end here
+                    beq       Done@@              ; if not, end here
                     lda       SCDR                ; otherwise read the data into A
-Check_Input_End     rts
+Done@@              rts
 
+;*******************************************************************************
 ; work on the byte that X points to that we get
-Output
-                    psha
-Output1             lda       0,x                 ; get first character of what X points to
-                    inx                           ; increment x to get the next address to read from
-                    cmpa      #$00                ; did we encounter a 0 char?
-                    beq       OutputEnd           ; if so, end
-                    bsr       Output_Char         ; otherwise, print the character, from regA
-                    bra       Output1             ; and start all over
 
-OutputEnd           pula
+Output              proc
+                    psha
+Loop@@              lda       ,x                  ; get first character of what X points to
+                    inx                           ; increment x to get the next address to read from
+                    tsta                          ; did we encounter a 0 char?
+                    beq       Done@@              ; if so, end
+                    bsr       Output_Char         ; otherwise, print the character, from regA
+                    bra       Loop@@              ; and start all over
+Done@@              pula
                     rts
 
+;*******************************************************************************
 ; expects data to send out in A
-Output_Char
+
+Output_Char         proc
                     pshb
-Output_Char1        ldb       SCSR                ; check to see if the transmit register is empty
+Loop@@              ldb       SCSR                ; check to see if the transmit register is empty
                     andb      #$80
                     cmpb      #$80
-                    bne       Output_Char1        ; if not, keep looping until it is
+                    bne       Loop@@              ; if not, keep looping until it is
                     sta       SCDR                ; finally, write the character to the SCI
                     pulb
                     rts
 
-; read from A/D converter and store in ADResult
-Read_AD             psha
+;*******************************************************************************
+; read from A/D converter and store in adresult
+
+Read_AD             proc
+                    psha
                     lda       #$01                ; prime A/D
                     sta       ADCTL
-Read_AD1            lda       ADCTL               ; read status bit
+Loop@@              lda       ADCTL               ; read status bit
                     anda      #$80
-                    beq       Read_AD1            ; keep checking
+                    beq       Loop@@              ; keep checking
                     lda       ADR2                ; we should have a result now
-                    sta       ADResult
+                    sta       adresult
                     pula
                     rts
 
-Voltage             fcb       $D
-                    fcc       "Voltage:    "
-                    fcb       0
-
-Resistance          fcb       $D
-                    fcc       "Resistance: "
-                    fcb       0
-
-; do the conversion.
-; note that we never need to divide by 256, since it's just a shift right
+;*******************************************************************************
+; Do the conversion.
+; Note that we never need to divide by 256, since it's just a shift right
 ; several times. We get the values out our own way.
-Fill_Digits
-                    psha
-                    pshb
-; multiply the result with our ref voltage
-                    ldb       ADResult
+
+FillDigits          proc
+                    pshd                          ; Bug? WAS PSHA/PSHB
+          ;-------------------------------------- ; multiply the result with our ref voltage
+                    ldb       adresult
                     lda       #R_H
                     mul
-; we end up with the most sig in A. Convert to ASCII
-                    adda      #$30
-                    sta       Dig5                ; save that digit
+          ;-------------------------------------- ; we end up with the most sig in A. Convert to ASCII
+                    adda      #'0'
+                    sta       dig5                ; save that digit
+          ;--------------------------------------
+          ; Multiply the remainder by 10 and convert to ASCII.
+          ; That's the next digit.
+          ; Continue until we get the desired precision
+          ;--------------------------------------
+                    bsr       ?Time10Ascii
+                    sta       dig4
 
-; multiply the remainder by 10 and convert to ASCII. That's the next digit.
-; continue that until we get the desired precision
-                    lda       #10
-                    mul
-                    adda      #$30
-                    sta       Dig4
-                    lda       #10
-                    mul
-                    adda      #$30
-                    sta       Dig3
-                    lda       #10
-                    mul
-                    adda      #$30
-                    sta       Dig2
-                    lda       #10
-                    mul
-                    adda      #$30
-                    sta       Dig1
-                    pula
-                    pulb
+                    bsr       ?Time10Ascii
+                    sta       dig3
+
+                    bsr       ?Time10Ascii
+                    sta       dig2
+
+                    bsr       ?Time10Ascii
+                    sta       dig1
+
+                    puld
                     rts
 
-Calc_Res            psha
+;*******************************************************************************
+
+?Time10Ascii        proc
+                    lda       #10
+                    mul
+                    adda      #'0'
+                    rts
+
+;*******************************************************************************
+
+Calc_Res            proc
+                    psha
                     pshb
                     clrb
-                    ldb       ADResult
+                    ldb       adresult
                     negb
-; we now have (256 - ADResult) in D. Switch to X to prepare for division
+          ;--------------------------------------
+          ; we now have (256 - adresult) in D. Switch to X to prepare for division
+          ;--------------------------------------
                     xgdx
-                    lda       ADResult
-                    ldb       #Rref
+                    lda       adresult
+                    ldb       #R_REF
                     mul
                     idiv
                     xgdx
-                    lsld
-                    lsld
-; now D contains the measured resistor value in HEX
-                    ldx       #$64
+                    lsld:2
+          ;--------------------------------------
+          ; now D contains the measured resistor value in HEX
+          ;--------------------------------------
+                    ldx       #100
                     idiv
                     xgdx
-                    ldx       #$A
+                    ldx       #10
                     idiv
                     xgdx
                     pula
                     pulb
                     rts
 
+;*******************************************************************************
+                    #VECTORS
+;*******************************************************************************
 
-; ===========
-; = Vectors =
-; ===========
                     org       $FFFE
-                    fdb       Init
+                    fdb       Start

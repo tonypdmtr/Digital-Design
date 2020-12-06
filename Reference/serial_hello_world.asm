@@ -1,61 +1,70 @@
+;*******************************************************************************
 ; Hello World for the CRT
+;*******************************************************************************
 
-; equ
 tx_byte             equ       $0000
 SCCR2               equ       $102D
 BAUD                equ       $102B
 SCSR                equ       $102E
 SCDR                equ       $102F
 
-; main
-                    org       $D000
-init
-                    lds       #$01FF
-                    cli
-                    bsr       init_sci
-main
-                    lda       #'H'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-                    lda       #'e'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-                    lda       #'l'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-                    lda       #'l'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-                    lda       #'o'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-                    lda       #'!'
-                    sta       tx_byte
-                    bsr       check_tx_byte
-endloop             bra       endloop
+Vsci                equ       $FFD6
+Vreset              equ       $FFFE
 
-; isr's
-isr_sci
+ROM                 equ       $D000
+STACKTOP            equ       $01FF
+
+;*******************************************************************************
+                    #ROM
+;*******************************************************************************
+                    org       ROM
+
+Start               proc
+                    lds       #STACKTOP
+                    cli
+                    bsr       InitSCI
+          ;--------------------------------------
+                    ldx       #Msg@@
+Loop@@              lda       ,x
+                    beq       Done@@
+                    bsr       CheckTxByte
+                    inx
+                    bra       Loop@@
+Done@@              bra       *
+
+Msg@@               fcs       'Hello!'
+
+;*******************************************************************************
+
+SCI_Handler         proc
                     lda       SCSR
                     lda       tx_byte
                     sta       SCDR
                     clr       tx_byte
                     rti
 
-; subs
-check_tx_byte
-                    lda       tx_byte
-                    bne       check_tx_byte
+;*******************************************************************************
+
+CheckTxByte         proc
+                    sta       tx_byte
+Loop@@              lda       tx_byte
+                    bne       Loop@@
                     rts
 
-init_sci
+;*******************************************************************************
+
+InitSCI             proc
                     lda       #$88
                     sta       SCCR2               ; turn on tx and tx interrupts
                     clr       BAUD                ; choose 125k baud
                     rts
 
-                    org       $FFD6
-                    dw        isr_sci
+;*******************************************************************************
+                    #VECTORS
+;*******************************************************************************
 
-                    org       $FFFE
-                    dw        init
+                    org       Vsci
+                    dw        SCI_Handler
+
+                    org       Vreset
+                    dw        Start
