@@ -14,7 +14,7 @@ value 1 for block, value 0 for empty
  = Moves =
  =========
  Use interrupt
- 
+
 1. check collision
 1.T move piece
 1.F ignore input

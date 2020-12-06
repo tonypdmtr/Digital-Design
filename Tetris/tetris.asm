@@ -1,1752 +1,1812 @@
-* =============
-* = Registers =
-* =============
-SP0CR1	equ	$08D0	*SPI Control
-SP0SR	equ	$08D3	*SPI Status
-SP0DR	equ	$08D5	*SPI Data
-SP0BR	equ	$08D2	*BAUD register
-DDRS	equ	$08D7
-PORTS	equ	$08D6
+                    #CaseOn
+; =============
+; = Registers =
+; =============
+SP0CR1              equ       $08D0               ; *SPI Control
+SP0SR               equ       $08D3               ; *SPI Status
+SP0DR               equ       $08D5               ; *SPI Data
+SP0BR               equ       $08D2               ; *BAUD register
+DDRS                equ       $08D7
+PORTS               equ       $08D6
 
-SC0SR1	equ	$08C4
-SC0DRL	equ	$08C7
+SC0SR1              equ       $08C4
+SC0DRL              equ       $08C7
 
-PORTG	equ	$0828	;Expanded Address of Command
-DDRG	equ	$082A
-PORTH	equ	$0829	;Expanded Address of Data
-DDRH	equ	$082B
+PORTG               equ       $0828               ; Expanded Address of Command
+DDRG                equ       $082A
+PORTH               equ       $0829               ; Expanded Address of Data
+DDRH                equ       $082B
 
-TIOS	equ	$0880	;In/Out
-TCNT	equ	$0884	;CNT High
-TSCR	equ	$0886	;Control
-TMSK1	equ	$088C	;Enable flag
-TMSK2	equ	$088D	;prescaler
-TFLG1	equ	$088E	;Flags
-TC1	equ	$0892	;CNT Set
-TC2	equ	$0894
+TIOS                equ       $0880               ; In/Out
+TCNT                equ       $0884               ; CNT High
+TSCR                equ       $0886               ; Control
+TMSK1               equ       $088C               ; Enable flag
+TMSK2               equ       $088D               ; prescaler
+TFLG1               equ       $088E               ; Flags
+TC1                 equ       $0892               ; CNT Set
+TC2                 equ       $0894
 
-BIT_0	equ	1	;/RESET
-BIT_1	equ	2	;/READ
-BIT_2	equ	4	;/WRITE
-BIT_3	equ	8	;/CS
-BIT_4	equ	16	;A0
+BIT_0               equ       1                   ; /RESET
+BIT_1               equ       2                   ; /READ
+BIT_2               equ       4                   ; /WRITE
+BIT_3               equ       8                   ; /CS
+BIT_4               equ       16                  ; A0
 
-CursorInit	equ	$0005	;Initial Condition for LCD stage
+CursorInit          equ       $0005               ; Initial Condition for LCD stage
 
-Mwrite	equ	$42	;Memory write command for LCD
+Mwrite              equ       $42                 ; Memory write command for LCD
 
-all_block_hght	equ	112
+all_block_hght      equ       112
 
-* =============
-* = Variables =
-* =============
+; =============
+; = Variables =
+; =============
 
-	org	$00
-* cursor pointers used to define location on screen	
-CPointer	rmb	2	;Pointer for current block
-CCPointer	rmb	2	;Pointer for clearning current block
-CSPointer	rmb	2	;Pointer for stage
-CHPointer	rmb	2	;Pointer for header
-* Score memory for game
-Score	rmb	2
-* define memory range to store the stage in.
-* stage = all unmovable pixels
-stage_beg	rmb	16
-stage_end	rmb	1
+                    org       $00
+; cursor pointers used to define location on screen
+CPointer            rmb       2                   ; Pointer for current block
+CCPointer           rmb       2                   ; Pointer for clearning current block
+CSPointer           rmb       2                   ; Pointer for stage
+CHPointer           rmb       2                   ; Pointer for header
+; Score memory for game
+Score               rmb       2
+; define memory range to store the stage in.
+; stage = all unmovable pixels
+stage_beg           rmb       16
+stage_end           rmb       1
 
-* points to the bottom memory location that defines
-* the block shape
-block_ptr	rmb	2
+; points to the bottom memory location that defines
+; the block shape
+block_ptr           rmb       2
 
-* it's the block height
-block_height	rmb	1
+; it's the block height
+block_height        rmb       1
 
-* L D R U Start _ _ Select
-buttons1	rmb	1
+; L D R U Start _ _ Select
+buttons1            rmb       1
 
-* Square X O /\ R1 L1 R2 L2
-buttons2	rmb	1
+; Square X O /\ R1 L1 R2 L2
+buttons2            rmb       1
 
-* saves last button configs
-buttons1l	rmb	1
-buttons2l	rmb	1
+; saves last button configs
+buttons1l           rmb       1
+buttons2l           rmb       1
 
-* offset from top of the stage, downwards
-stage_block_ptr	rmb 	2
+; offset from top of the stage, downwards
+stage_block_ptr     rmb       2
 
-* FF if vertical collision detected
-collision	rmb	1
-game_over	rmb	1
+; FF if vertical collision detected
+collision           rmb       1
+game_over           rmb       1
 
-temp	rmb	2
-shift_offset	rmb	1
-rot_offset	rmb	1
-cur_block_id	rmb	1
+temp                rmb       2
+shift_offset        rmb       1
+rot_offset          rmb       1
+cur_block_id        rmb       1
 
-* save state information here
-sav_block_ptr	rmb	2
-sav_shft_offset	rmb	1
-sav_rot_offset	rmb	1
+; save state information here
+sav_block_ptr       rmb       2
+sav_shft_offset     rmb       1
+sav_rot_offset      rmb       1
 
-	org	$1000
-* ========
-* = Init =
-* ========
-Init:	
-	sei
-	jsr	clear_stage_mem
-	jsr	SPI_INIT
-	jsr	Var_Init
-	jsr	LCD_INIT
-	jsr	InitCurPointers
-	jsr	InitStage
-	jsr	InitTimer
-	cli
-	bra	Main
+                    org       $1000
+; ========
+; = Init =
+; ========
+Init
+                    sei
+                    jsr       clear_stage_mem
+                    bsr       SPI_INIT
+                    bsr       Var_Init
+                    jsr       LCD_INIT
+                    jsr       InitCurPointers
+                    bsr       InitStage
+                    bsr       InitTimer
+                    cli
+                    bra       Main
 
-*Init SPI
-SPI_INIT:
-	ldab	DDRS	*Load Current state of DDRS
-	orab	#%11100000	*Define output ports for Port S
-	stab	DDRS	*store
-	ldab	#%01011101	*Enable SPI
-	stab	SP0CR1
-	ldab	#%00000110	* set rate to 64kHz
-	stab	SP0BR
-	ldab	PORTS	
-	orab	#$80
-	stab	PORTS
-	rts
-* initialize variables here
-Var_Init:	ldaa	#4
-	clr	buttons1l
-	clr	buttons2l
-	staa	block_height
-	ldaa	#128
-	staa	rot_offset
-	clr     	shift_offset
-	ldd	#0
-	std	Score
-	ldaa	#$FF
-	staa	stage_end
-	clr	game_over
-	clr     	collision
-	rts
+; *Init SPI
+SPI_INIT
+                    ldb       DDRS                ; *Load Current state of DDRS
+                    orb       #%11100000          ; *Define output ports for Port S
+                    stb       DDRS                ; *store
+                    ldb       #%01011101          ; *Enable SPI
+                    stb       SP0CR1
+                    ldb       #%00000110          ; set rate to 64kHz
+                    stb       SP0BR
+                    ldb       PORTS
+                    orb       #$80
+                    stb       PORTS
+                    rts
 
-* initialize timer subsystem
-InitTimer:
-	ldd	#$FFFF
-	std	TC1
-	ldd	#$0FFF
-	std	TC2
-	ldaa	#$07
-	staa	TMSK2
-	ldaa	#$06	;TC1, TC2 Timer
-	staa	TIOS
-	ldaa	#$80	;Enable Timer
-	staa	TSCR
-	ldaa	#$06	;TC1 - EN, TC2 - EN
-	staa	TMSK1
-	rts
+; initialize variables here
+Var_Init            lda       #4
+                    clr       buttons1l
+                    clr       buttons2l
+                    sta       block_height
+                    lda       #128
+                    sta       rot_offset
+                    clr       shift_offset
+                    ldd       #0
+                    std       Score
+                    lda       #$FF
+                    sta       stage_end
+                    clr       game_over
+                    clr       collision
+                    rts
 
-* draw up the stage
-InitStage:	
-	jsr	DrawStageBounds
-	jsr	ScoreBoard
-	jsr	determine_block
-	jsr 	serve_block
-	jsr	DrawShape
-	jsr     	TetrisTitle
-	rts
-	
-clear_stage_mem:
-	ldx	#stage_beg
-	ldab	#16
-clear_stage_mem1:	
-	clr	0,x
-	inx
-	decb
-	bne	clear_stage_mem1
-clear_stage_mem2:
-	rts
-		
-* ========
-* = Main =
-* ========
-Main:
-	jsr	get_buttons
+; initialize timer subsystem
+InitTimer
+                    ldd       #$FFFF
+                    std       TC1
+                    ldd       #$0FFF
+                    std       TC2
+                    lda       #$07
+                    sta       TMSK2
+                    lda       #$06                ; TC1, TC2 Timer
+                    sta       TIOS
+                    lda       #$80                ; Enable Timer
+                    sta       TSCR
+                    lda       #$06                ; TC1 - EN, TC2 - EN
+                    sta       TMSK1
+                    rts
 
-* check for down button
-	ldaa	buttons1
-	anda	#$40
-	beq	Main0
-	sei
-Main0_1:
-	jsr	move_down
-	ldaa	collision
-	bne	Main0_2
-	bra	Main0_1
-Main0_2:
-	clr     	collision
-	cli
-	bra	MainE
+; draw up the stage
+InitStage
+                    jsr       DrawStageBounds
+                    jsr       ScoreBoard
+                    jsr       determine_block
+                    jsr       serve_block
+                    jsr       DrawShape
+                    jsr       TetrisTitle
+                    rts
 
-Main0:	
-* check for left button
-	ldaa	buttons1
-	anda	#$80
-	beq	Main1
-	jsr	check_hcol_l
-	ldaa	collision
-	bne	MainE
-	jsr	move_left
-	dec     	shift_offset
-	bra	MainE
-Main1:
-* check for right button
-	ldaa	buttons1
-	anda	#$20
-	beq	Main2
-	jsr	check_hcol_r
-	ldaa	collision
-	bne	MainE
-	jsr	move_right
-	inc	shift_offset
-	bra	MainE
-Main2:
-	
-	
-* check for rotate left (square)
-	ldaa	buttons2
-	anda	#$80
-	beq	Main3
-	jsr	save_state
-	jsr	rotate_left
-	jsr	check_rcol
-	ldaa	collision
-	bne	Main2_1
-	bra	MainE
-Main2_1:
-	jsr	revert_state
-	bra	MainE
-Main3:
-* check for rotate right (X)
-	ldaa	buttons2
-	anda	#$40
-	beq	Main4
-	jsr	save_state
-	jsr	rotate_right
-	jsr	check_rcol
-	ldaa	collision
-	bne	Main3_1
-	bra	MainE
-Main3_1:
-	jsr	revert_state
-	bra	MainE
+clear_stage_mem
+                    ldx       #stage_beg
+                    ldb       #16
+clear_stage_mem1
+                    clr       0,x
+                    inx
+                    decb
+                    bne       clear_stage_mem1
+clear_stage_mem2
+                    rts
 
-Main4:
-* check for Pause (Start button )
-	ldaa	buttons1
-	anda	#$08
-	beq	MainE
-	sei
-	jsr	DrawPause
-Main4_1:
-	jsr	get_buttons
-	ldaa	buttons1
-	anda	#$08
-	beq	Main4_1
-	jsr	ClearPause
-	bra	Main4_2
-	
-Main4_2:	cli
-	bra	MainE
-MainE:
-	ldaa	game_over
-	lbne 	show_gameover
-* reset collision byte. It's a new dawn!
-	clr 	collision
-	lbra	Main
+; ========
+; = Main =
+; ========
+Main
+                    jsr       get_buttons
 
-* ========
-* = Subs =
-* ========
+; check for down button
+                    lda       buttons1
+                    anda      #$40
+                    beq       Main0
+                    sei
+Main0_1
+                    jsr       move_down
+                    lda       collision
+                    bne       Main0_2
+                    bra       Main0_1
 
-* saves buttons in buttons1 and buttons2
-get_buttons:
-	psha
-	pshb
-	jsr	Pad_En
-	ldab	#$01	* send Hello to pad
-	jsr	Pad_RW
-	ldab	#$42	* now send request for data
-	jsr	Pad_RW	* after this we get Pad ID
-	ldab	#$00
-	jsr	Pad_RW
-	ldab	#$00
-	jsr	Pad_RW
-	comb
-	cmpb	buttons1l
-	bne	get_buttons1
-	clr	buttons1
-	bra	get_buttons2
-get_buttons1:
-	stab	buttons1
-	stab	buttons1l
-get_buttons2:
-	ldab	#$00
-	jsr	Pad_RW
-	comb
-	cmpb	buttons2l
-	bne	get_buttons3
-	clr	buttons2
-	bra	get_buttons4
-get_buttons3:
-	stab	buttons2
-	stab	buttons2l
-get_buttons4:
-	jsr	Pad_En
-	pulb
-	pula
-	rts
+Main0_2
+                    clr       collision
+                    cli
+                    bra       MainE
 
-* =======================
-* = SPI utility methods =
-* =======================
-*Toggles Pad SS
-Pad_En:
-	pshb
-	ldab	PORTS	*Load Current State of PORTS
-	eorb	#$80	*Toggle Slave Select
-	stab	PORTS	*Store back
-	pulb
-	rts
+Main0
+; check for left button
+                    lda       buttons1
+                    anda      #$80
+                    beq       Main1
+                    jsr       check_hcol_l
+                    lda       collision
+                    bne       MainE
+                    jsr       move_left
+                    dec       shift_offset
+                    bra       MainE
 
-* In: {B} with what's sent to the pad
-* Out: {B} with what's returned
-Pad_RW:		
-	psha
-	stab	SP0DR	*Store {B} to send to pad
+Main1
+; check for right button
+                    lda       buttons1
+                    anda      #$20
+                    beq       Main2
+                    jsr       check_hcol_r
+                    lda       collision
+                    bne       MainE
+                    jsr       move_right
+                    inc       shift_offset
+                    bra       MainE
 
-Pad_RW1:
-	ldab	SP0SR	*Reads Pad Status Register
-	andb	#$80	*Checks for status high on bit 7
-	beq	Pad_RW1	*Checks again if not high
-	ldab	SP0DR	*Pulls data from Pad
-Pad_RW_E:	pula
-	rts
+Main2
 
-	
-* ==================
-* = Button actions =
-* ==================
 
-* shift block left
-move_left:
-	psha
-	pshx
-	pshb
-	ldx	block_ptr
-	ldab	block_height
-move_left_1:
-	ldaa	0,x
-	lsla
-	staa    	0,x
- 	dex
-	decb
-	beq	move_left_end
-	bra	move_left_1
-move_left_end:
-	pulb
-	pulx
-	pula
-	rts
+; check for rotate left (square)
+                    lda       buttons2
+                    anda      #$80
+                    beq       Main3
+                    jsr       save_state
+                    jsr       rotate_left
+                    jsr       check_rcol
+                    lda       collision
+                    bne       Main2_1
+                    bra       MainE
 
-* shift the block right
-move_right:
-	psha
-	pshx
-	pshb
-	ldx	block_ptr
-	ldab	block_height
-move_right_1:
-	ldaa	0,x
-	lsra
-	staa   	0,x
-	dex
-	decb
-	beq	move_right_end
-	bra	move_right_1
-move_right_end:
-	pulb
-	pulx
-	pula
-	rts
+Main2_1
+                    jsr       revert_state
+                    bra       MainE
 
-rotate_left:
-	pshx
-	pshb
-	inc	rot_offset
-	ldab	cur_block_id
-	jsr	serve_block
-	pulb
-	pulx
-	rts
-	
-rotate_right:
-	pshx
-	pshb
-	dec	rot_offset
-	ldab	cur_block_id
-	jsr 	serve_block
-	pulb
-	pulx
-	rts
+Main3
+; check for rotate right (X)
+                    lda       buttons2
+                    anda      #$40
+                    beq       Main4
+                    jsr       save_state
+                    jsr       rotate_right
+                    jsr       check_rcol
+                    lda       collision
+                    bne       Main3_1
+                    bra       MainE
 
-move_down:	ldx	block_ptr	
-	jsr	check_vcol
-	ldaa	collision
-	cmpa	#$FF
-* if we have a collision, merge block into the stage.
-* else increment stage block pointer
-	beq	move_down_2
-	ldd     	stage_block_ptr
-	incb
-	std     	stage_block_ptr
-	bra	move_down_end
-move_down_2:
-	jsr	merge_blk2stg
- 	jsr	clr_fl_rws
-	jsr     	DrawStage
-	jsr	check_gameover
+Main3_1
+                    jsr       revert_state
+                    bra       MainE
+
+Main4
+; check for Pause (Start button )
+                    lda       buttons1
+                    anda      #$08
+                    beq       MainE
+                    sei
+                    jsr       DrawPause
+Main4_1
+                    bsr       get_buttons
+                    lda       buttons1
+                    anda      #$08
+                    beq       Main4_1
+                    jsr       ClearPause
+; bra       Main4_2
+
+Main4_2             cli
+; bra       MainE
+MainE
+                    lda       game_over
+                    jne       show_gameover
+; reset collision byte. It's a new dawn!
+                    clr       collision
+                    jmp       Main
+
+; ========
+; = Subs =
+; ========
+
+; saves buttons in buttons1 and buttons2
+get_buttons
+                    psha
+                    pshb
+                    bsr       Pad_En
+                    ldb       #$01                ; send Hello to pad
+                    bsr       Pad_RW
+                    ldb       #$42                ; now send request for data
+                    bsr       Pad_RW              ; after this we get Pad ID
+                    ldb       #$00
+                    bsr       Pad_RW
+                    ldb       #$00
+                    bsr       Pad_RW
+                    comb
+                    cmpb      buttons1l
+                    bne       get_buttons1
+                    clr       buttons1
+                    bra       get_buttons2
+
+get_buttons1
+                    stb       buttons1
+                    stb       buttons1l
+get_buttons2
+                    ldb       #$00
+                    bsr       Pad_RW
+                    comb
+                    cmpb      buttons2l
+                    bne       get_buttons3
+                    clr       buttons2
+                    bra       get_buttons4
+
+get_buttons3
+                    stb       buttons2
+                    stb       buttons2l
+get_buttons4
+                    bsr       Pad_En
+                    pulb
+                    pula
+                    rts
+
+; =======================
+; = SPI utility methods =
+; =======================
+; *Toggles Pad SS
+Pad_En
+                    pshb
+                    ldb       PORTS               ; *Load Current State of PORTS
+                    eorb      #$80                ; *Toggle Slave Select
+                    stb       PORTS               ; *Store back
+                    pulb
+                    rts
+
+; In: {B} with what's sent to the pad
+; Out: {B} with what's returned
+Pad_RW
+                    psha
+                    stb       SP0DR               ; *Store {B} to send to pad
+
+Pad_RW1
+                    ldb       SP0SR               ; *Reads Pad Status Register
+                    andb      #$80                ; *Checks for status high on bit 7
+                    beq       Pad_RW1             ; *Checks again if not high
+                    ldb       SP0DR               ; *Pulls data from Pad
+Pad_RW_E            pula
+                    rts
+
+
+; ==================
+; = Button actions =
+; ==================
+
+; shift block left
+move_left
+                    psha
+                    pshx
+                    pshb
+                    ldx       block_ptr
+                    ldb       block_height
+move_left_1
+                    lda       0,x
+                    lsla
+                    sta       0,x
+                    dex
+                    decb
+                    beq       move_left_end
+                    bra       move_left_1
+
+move_left_end
+                    pulb
+                    pulx
+                    pula
+                    rts
+
+; shift the block right
+move_right
+                    psha
+                    pshx
+                    pshb
+                    ldx       block_ptr
+                    ldb       block_height
+move_right_1
+                    lda       0,x
+                    lsra
+                    sta       0,x
+                    dex
+                    decb
+                    beq       move_right_end
+                    bra       move_right_1
+
+move_right_end
+                    pulb
+                    pulx
+                    pula
+                    rts
+
+rotate_left
+                    pshx
+                    pshb
+                    inc       rot_offset
+                    ldb       cur_block_id
+                    jsr       serve_block
+                    pulb
+                    pulx
+                    rts
+
+rotate_right
+                    pshx
+                    pshb
+                    dec       rot_offset
+                    ldb       cur_block_id
+                    jsr       serve_block
+                    pulb
+                    pulx
+                    rts
+
+move_down           ldx       block_ptr
+                    jsr       check_vcol
+                    lda       collision
+                    cmpa      #$FF
+; if we have a collision, merge block into the stage.
+; else increment stage block pointer
+                    beq       move_down_2
+                    ldd       stage_block_ptr
+                    incb
+                    std       stage_block_ptr
+                    bra       move_down_end
+
+move_down_2
+                    jsr       merge_blk2stg
+                    bsr       clr_fl_rws
+                    jsr       DrawStage
+                    bsr       check_gameover
 move_down_3
-	jsr	determine_block
-	jsr	serve_block
-move_down_end:
-	rts
-	
-	
-	
-show_gameover:
-	sei
-	jsr     	GameOver
-show_gameover1:
-	jsr	get_buttons
-	ldaa	buttons1
-	anda	#$08
-	beq	show_gameover1
-	lbra	Init
-* ===================
-* = Game Logic subs =
-* ===================
-
-
-check_gameover:
-	pshx
-	psha
-	ldx	#stage_beg
-	ldaa	0,x
-	anda	#$FF
-	beq	check_gameover_e
-	ldaa	#$FF
-	staa	game_over
-check_gameover_e:
-	pula
-	pulx
-	rts
-
-clr_fl_rws:
-	pshx
-	psha
-* start at the end of the stage
-	ldx	#stage_end
-	dex
-	ldab	#0
-clr_fl_rws_0:
-* see if the current row is full
-	ldaa	0,x
-	cmpa	#$FF
-* if not, move on, else, do some stuff
-	bne	clr_fl_rws_1
-* transfer X to Y and work with it for the internal loop
-	pshx
-	pshd
-	xgdx
-	xgdy
-	puld
-	pulx
-* also increase the score
-	jsr     	Score_Inc
-	incb
-	cmpb	#4
-	bne	clr_fl_rws_01
-	jsr	Score_Inc_Bonus
-clr_fl_rws_01:
-* take the previous row and overwrite the current row with it
-	ldaa	-1,y
-	staa	0,y
-	dey
-* if we're at the top of the stage, exit this loop.
-* otherwise, keep moving lines down
-	cpy	#stage_beg
-	beq     	clr_fl_rws_11
-	bra	clr_fl_rws_01
-clr_fl_rws_1:
-* now move up to the next line and start the process over,
-* until we arrive at the beginning of the stage.
-	dex
-clr_fl_rws_11:
-	cpx	#stage_beg
-	beq	clr_fl_rws_end
-	bra	clr_fl_rws_0
-clr_fl_rws_end:
-	clrb
-	pula
-	pulx
-	rts
-
-merge_blk2stg:
-	pshx
-	pshy
-	pshd
-	ldab	block_height
-	ldy	stage_block_ptr
-	leax	stage_beg,Y
-	ldy	block_ptr
-merge_blk2stg_1:
-	ldaa	0,x
-	oraa	0,y
-	staa	0,x
-	dex
-	dey
-	decb	
-	bne	merge_blk2stg_1
-	puld
-	puly
-	pulx
-	rts
-
-
-determine_block:
-	jsr	rst_van_blks
-	ldaa	#128
-	staa	rot_offset
-	clr     	shift_offset
-	ldd	TCNT
-	ldx	#7
-	idiv
-* now we have a number from 0-4 in D/B
-;	ldab    #01
-	stab	cur_block_id
-	pshb
-	ldd	#$3
-	std	stage_block_ptr
-	pulb
-	rts
-
-* serve the block with ID given in B
-serve_block:
-* shift the block back to initial position. Then, later, we
-* move it forward again to the right spot.
-* 
-	ldaa	shift_offset
-serve_block_1:
-	cmpa	#00
-	beq	serve_block_2
-	jsr	move_left
-	deca
-	bra	serve_block_1
-serve_block_2:
-* this is the number of bytes per block to calc offset.
-* it lands us at the right block type.
-	ldaa	#16
-	mul
-* now we have the offset from the first block in D
-	std	temp
-	
-* get rotation offset. Result will be one of [0-3].
-	clrb
-	ldab	rot_offset
-	ldx	#4
-	idiv
-* now we know which rotation. Multiply by 4 to get number
-* of bytes
-	ldaa	#4
-	mul
-	addd	temp
-	ldx	#BLK_squareU
-	inx
-	inx
-	inx
-	leax	d,x
-* now we have a random block in X
- 	stx	block_ptr
-
-* now shift the block back right
-	ldaa    	shift_offset
-serve_block_3:
-	cmpa	#00
-	beq	serve_block_4
-	jsr	move_right
-	deca
-	bra	serve_block_3
-serve_block_4:
-	rts
+                    jsr       determine_block
+                    jsr       serve_block
+move_down_end
+                    rts
 
 
 
-rst_van_blks:
-	ldx	#BLK_squareU
-	ldy	#BLK_van_squareU
-	ldab	#all_block_hght
-rst_van_blks_1:
-	ldaa	0,y
-	staa	0,x
-	inx
-	iny
-	decb
-	bne	rst_van_blks_1
-	rts
+show_gameover
+                    sei
+                    jsr       GameOver
+show_gameover1
+                    jsr       get_buttons
+                    lda       buttons1
+                    anda      #$08
+                    beq       show_gameover1
+                    lbra      Init
+; ===================
+; = Game Logic subs =
+; ===================
 
 
-save_state:
-	pshx
-	psha
-	ldx	block_ptr
-	stx	sav_block_ptr
-	ldaa	shift_offset
-	staa	sav_shft_offset
-	ldaa	rot_offset
-	staa	sav_rot_offset
-	pula
-	pulx
-	rts
-	
-revert_state:
-	pshx
-	pshd
-	ldab    	block_height
-	ldx     	block_ptr
-	leax	all_block_hght,x
-	ldy     	block_ptr
+check_gameover
+                    pshx
+                    psha
+                    ldx       #stage_beg
+                    lda       0,x
+                    anda      #$FF
+                    beq       check_gameover_e
+                    lda       #$FF
+                    sta       game_over
+check_gameover_e
+                    pula
+                    pulx
+                    rts
+
+clr_fl_rws
+                    pshx
+                    psha
+; start at the end of the stage
+                    ldx       #stage_end
+                    dex
+                    ldb       #0
+clr_fl_rws_0
+; see if the current row is full
+                    lda       0,x
+                    cmpa      #$FF
+; if not, move on, else, do some stuff
+                    bne       clr_fl_rws_1
+; transfer X to Y and work with it for the internal loop
+                    pshx
+                    pshd
+                    xgdx
+                    xgdy
+                    puld
+                    pulx
+; also increase the score
+                    jsr       Score_Inc
+                    incb
+                    cmpb      #4
+                    bne       clr_fl_rws_01
+                    jsr       Score_Inc_Bonus
+clr_fl_rws_01
+; take the previous row and overwrite the current row with it
+                    dey
+                    lda       ,y
+                    sta       1,y
+; if we're at the top of the stage, exit this loop.
+; otherwise, keep moving lines down
+                    cpy       #stage_beg
+                    beq       clr_fl_rws_11
+                    bra       clr_fl_rws_01
+
+clr_fl_rws_1
+; now move up to the next line and start the process over,
+; until we arrive at the beginning of the stage.
+                    dex
+clr_fl_rws_11
+                    cpx       #stage_beg
+                    beq       clr_fl_rws_end
+                    bra       clr_fl_rws_0
+
+clr_fl_rws_end
+                    clrb
+                    pula
+                    pulx
+                    rts
+
+merge_blk2stg
+                    pshx
+                    pshy
+                    pshd
+                    ldb       block_height
+                    ldy       stage_block_ptr
+                    tyx
+                    aix       #stage_beg
+                    ldy       block_ptr
+merge_blk2stg_1
+                    lda       ,x
+                    ora       ,y
+                    sta       ,x
+                    dex
+                    dey
+                    decb
+                    bne       merge_blk2stg_1
+                    puld
+                    puly
+                    pulx
+                    rts
+
+
+determine_block
+                    bsr       rst_van_blks
+                    lda       #128
+                    sta       rot_offset
+                    clr       shift_offset
+                    ldd       TCNT
+                    ldx       #7
+                    idiv
+; now we have a number from 0-4 in D/B
+; ldb     #01
+                    stb       cur_block_id
+                    pshb
+                    ldd       #$3
+                    std       stage_block_ptr
+                    pulb
+                    rts
+
+; serve the block with ID given in B
+serve_block
+; shift the block back to initial position. Then, later, we
+; move it forward again to the right spot.
+;
+                    lda       shift_offset
+serve_block_1
+                    cmpa      #00
+                    beq       serve_block_2
+                    jsr       move_left
+                    deca
+                    bra       serve_block_1
+
+serve_block_2
+; this is the number of bytes per block to calc offset.
+; it lands us at the right block type.
+                    lda       #16
+                    mul
+; now we have the offset from the first block in D
+                    std       temp
+
+; get rotation offset. Result will be one of [0-3].
+                    clrb
+                    ldb       rot_offset
+                    ldx       #4
+                    idiv
+; now we know which rotation. Multiply by 4 to get number
+; of bytes
+                    lda       #4
+                    mul
+                    addd      temp
+                    ldx       #BLK_squareU+3
+                    jsr       leax_dx
+; now we have a random block in X
+                    stx       block_ptr
+
+; now shift the block back right
+                    lda       shift_offset
+serve_block_3
+                    cmpa      #0
+                    beq       serve_block_4
+                    jsr       move_right
+                    deca
+                    bra       serve_block_3
+
+serve_block_4
+                    rts
+
+
+
+rst_van_blks
+                    ldx       #BLK_squareU
+                    ldy       #BLK_van_squareU
+                    ldb       #all_block_hght
+rst_van_blks_1
+                    lda       0,y
+                    sta       0,x
+                    inx
+                    iny
+                    decb
+                    bne       rst_van_blks_1
+                    rts
+
+
+save_state
+                    pshx
+                    psha
+                    ldx       block_ptr
+                    stx       sav_block_ptr
+                    lda       shift_offset
+                    sta       sav_shft_offset
+                    lda       rot_offset
+                    sta       sav_rot_offset
+                    pula
+                    pulx
+                    rts
+
+revert_state
+                    pshx
+                    pshd
+                    ldb       block_height
+                    ldx       block_ptr
+                    aix       #all_block_hght
+                    ldy       block_ptr
 revert_state_11
-	ldaa    	0,x
-	staa    	0,y
-	dex
-	dey
-	decb
-	bne     	revert_state_11
-	
-	ldx     	sav_block_ptr
-	stx	block_ptr
-	ldaa	sav_shft_offset
-	staa	shift_offset
-	ldaa	sav_rot_offset
-	staa	rot_offset
-	ldaa    	shift_offset
-revert_state_1:
-	cmpa	#0
-	beq	revert_state_2
-	jsr	move_right
-	deca
-	bra	revert_state_1
-	
-revert_state_2:
-	puld
-	pulx
-	rts
+                    lda       0,x
+                    sta       0,y
+                    dex
+                    dey
+                    decb
+                    bne       revert_state_11
 
-check_rcol:
-	pshx
-	psha
-	pshb
-* first, check if the rotation cut off the block.
-* to do that, we move it left and compare it with
-* vanilla. If it's the same, we're good and move on 
-* to stage collision check.
-	ldaa	shift_offset
-check_rcol_1:
-	cmpa	#0
-	beq	check_rcol_2
-	jsr	move_left
-	deca
-	bra     	check_rcol_1
-check_rcol_2:
-	ldx	block_ptr
-	ldy     	block_ptr
-	leay	all_block_hght,y
-	ldaa	block_height
+                    ldx       sav_block_ptr
+                    stx       block_ptr
+                    lda       sav_shft_offset
+                    sta       shift_offset
+                    lda       sav_rot_offset
+                    sta       rot_offset
+                    lda       shift_offset
+revert_state_1
+                    cmpa      #0
+                    beq       revert_state_2
+                    jsr       move_right
+                    deca
+                    bra       revert_state_1
+
+revert_state_2
+                    puld
+                    pulx
+                    rts
+
+check_rcol
+                    pshx
+                    psha
+                    pshb
+; first, check if the rotation cut off the block.
+; to do that, we move it left and compare it with
+; vanilla. If it's the same, we're good and move on
+; to stage collision check.
+                    lda       shift_offset
+check_rcol_1
+                    cmpa      #0
+                    beq       check_rcol_2
+                    jsr       move_left
+                    deca
+                    bra       check_rcol_1
+
+check_rcol_2
+                    ldx       block_ptr
+                    ldy       block_ptr
+                    aiy       #all_block_hght
+                    lda       block_height
 check_rcol_3
-	ldab	0,x
-	eorb	0,y
-	bne	check_rcol_col
-	dex
-	dey
-	deca
-	beq	check_rcol_5
-	bra	check_rcol_3
+                    ldb       0,x
+                    eorb      0,y
+                    bne       check_rcol_col
+                    dex
+                    dey
+                    deca
+                    beq       check_rcol_5
+                    bra       check_rcol_3
 
-* at this point we know the block isn't cut off, so
-* check the stage
-check_rcol_5:
-	ldaa	shift_offset
-check_rcol_6:
-	cmpa	#0
-	beq	check_rcol_7
-	jsr	move_right
-	deca
-	bra     	check_rcol_6
-check_rcol_7:
-	ldab	block_height
-	ldx	block_ptr
-	ldy	stage_block_ptr
-	leay	stage_beg,y
-check_rcol_8:
-	ldaa	0,x
-	anda	0,y
-	bne	check_rcol_col
-	dex
-	dey
-	decb
-	beq	check_rcol_e
-	bra	check_rcol_8
-check_rcol_col:
-	jsr	set_collision
-check_rcol_e:
-	pulb
-	pula
-	pulx
-	rts
+; at this point we know the block isn't cut off, so
+; check the stage
+check_rcol_5
+                    lda       shift_offset
+check_rcol_6
+                    cmpa      #0
+                    beq       check_rcol_7
+                    jsr       move_right
+                    deca
+                    bra       check_rcol_6
 
-* check for horizontal collision left
-check_hcol_l:
-	pshx
-	pshy
-	pshd
-	ldab	block_height
-	ldx	block_ptr
-check_hcol_l1:
-* first make sure if any line of the block
-* already occupies bit 7
-	ldaa	0,x
-	anda	#$80
-	bne	check_hcol_lcol
-	dex
-	decb
-	beq	check_hcol_l2
-	bra	check_hcol_l1
-* now that we checked bit 7, check collision
-* with the stage.
-check_hcol_l2:
-	ldab	block_height
-	ldx	block_ptr
-	ldy	stage_block_ptr
-	leay	stage_beg,y
-check_hcol_l3:
-	ldaa	0,x
-	lsla
-	anda	0,y
-	bne	check_hcol_lcol
-	dex
-	dey
-	decb
-	beq	check_hcol_lend
-	bra	check_hcol_l3
-check_hcol_lcol:
-	jsr	set_collision
-check_hcol_lend:
-	puld
-	puly
-	pulx
-	rts
+check_rcol_7
+                    ldb       block_height
+                    ldx       block_ptr
+                    ldy       stage_block_ptr
+                    aiy       #stage_beg
+check_rcol_8
+                    lda       0,x
+                    anda      0,y
+                    bne       check_rcol_col
+                    dex
+                    dey
+                    decb
+                    beq       check_rcol_e
+                    bra       check_rcol_8
 
+check_rcol_col
+                    jsr       set_collision
+check_rcol_e
+                    pulb
+                    pula
+                    pulx
+                    rts
 
-* check for horizontal collision right
-check_hcol_r:
-	pshx
-	pshy
-	pshd
-	ldab	block_height
-	ldx	block_ptr
-check_hcol_r1:
-* first make sure if any line of the block
-* already occupies bit 0
-	ldaa	0,x
-	anda	#$01
-	bne	check_hcol_rcol
-	dex
-	decb
-	beq	check_hcol_r2
-	bra	check_hcol_r1
-* now that we checked bit 7, check collision
-* with the stage.
-check_hcol_r2:
-	ldab	block_height
-	ldx	block_ptr
-	ldy	stage_block_ptr
-	leay	stage_beg,y
-check_hcol_r3:
-	ldaa	0,x
-	lsra
-	anda	0,y
-	bne	check_hcol_rcol
-	dex
-	dey
-	decb
-	beq	check_hcol_rend
-	bra	check_hcol_r3
-check_hcol_rcol:
-	jsr	set_collision
-check_hcol_rend:
-	puld
-	puly
-	pulx
-	rts
+; check for horizontal collision left
+check_hcol_l
+                    pshx
+                    pshy
+                    pshd
+                    ldb       block_height
+                    ldx       block_ptr
+check_hcol_l1
+; first make sure if any line of the block
+; already occupies bit 7
+                    lda       0,x
+                    anda      #$80
+                    bne       check_hcol_lcol
+                    dex
+                    decb
+                    beq       check_hcol_l2
+                    bra       check_hcol_l1
+
+; now that we checked bit 7, check collision
+; with the stage.
+check_hcol_l2
+                    ldb       block_height
+                    ldx       block_ptr
+                    ldy       stage_block_ptr
+                    aiy       #stage_beg
+check_hcol_l3
+                    lda       0,x
+                    lsla
+                    anda      0,y
+                    bne       check_hcol_lcol
+                    dex
+                    dey
+                    decb
+                    beq       check_hcol_lend
+                    bra       check_hcol_l3
+
+check_hcol_lcol
+                    bsr       set_collision
+check_hcol_lend
+                    puld
+                    puly
+                    pulx
+                    rts
 
 
-* checks for vertical collisions 
-check_vcol:
-	psha
-	pshb
-	pshx
-	pshy
-	ldab	block_height
-* x will keep track of the block line
-	ldx	block_ptr
-* y will keep track of the stage line
-	ldy	stage_block_ptr
-	leay    	stage_beg,y
-check_vcol1:
-* look ahead one row
-	ldaa	1,y
-* and it with the current line of the block
-	anda	0,x
-* if we don't get 0, we have a collision
-	bne	check_vcol_col
-	dex
-	dey
-	decb
-	bne	check_vcol1
-	bra	check_vcol_end
-check_vcol_col:
-	jsr	set_collision
-	
-check_vcol_end:	
-	puly
-	pulx
-	pulb
-	pula
-	rts	
+; check for horizontal collision right
+check_hcol_r
+                    pshx
+                    pshy
+                    pshd
+                    ldb       block_height
+                    ldx       block_ptr
+check_hcol_r1
+; first make sure if any line of the block
+; already occupies bit 0
+                    lda       0,x
+                    anda      #$01
+                    bne       check_hcol_rcol
+                    dex
+                    decb
+                    beq       check_hcol_r2
+                    bra       check_hcol_r1
+
+; now that we checked bit 7, check collision
+; with the stage.
+check_hcol_r2
+                    ldb       block_height
+                    ldx       block_ptr
+                    ldy       stage_block_ptr
+                    aiy       #stage_beg
+check_hcol_r3
+                    lda       0,x
+                    lsra
+                    anda      0,y
+                    bne       check_hcol_rcol
+                    dex
+                    dey
+                    decb
+                    beq       check_hcol_rend
+                    bra       check_hcol_r3
+
+check_hcol_rcol
+                    bsr       set_collision
+check_hcol_rend
+                    puld
+                    puly
+                    pulx
+                    rts
 
 
-set_collision:
-	ldaa	#$FF
-	staa	collision	
- 	rts
+; checks for vertical collisions
+check_vcol
+                    psha
+                    pshb
+                    pshx
+                    pshy
+                    ldb       block_height
+; x will keep track of the block line
+                    ldx       block_ptr
+; y will keep track of the stage line
+                    ldy       stage_block_ptr
+                    aiy       #stage_beg
+check_vcol1
+; look ahead one row
+                    lda       1,y
+; and it with the current line of the block
+                    anda      0,x
+; if we don't get 0, we have a collision
+                    bne       check_vcol_col
+                    dex
+                    dey
+                    decb
+                    bne       check_vcol1
+                    bra       check_vcol_end
 
-* ========= *
-* = Score = *
-* ========= *
+check_vcol_col
+                    bsr       set_collision
 
-Score_Inc:	pshd
-	ldd	Score
-	addd	#3
-	std	Score
-	puld
-	jsr     	ScoreBoard
-	rts
-	
-Score_Inc_Bonus:
-	pshd
-	ldd	Score
-	addd	#10
-	std	Score
-	puld
-	jsr	ScoreBoard
-	rts
-	
-	
-Score_Rst:	pshd
-	ldd	#0
-	std	Score
-	puld
-	jsr     	ScoreBoard
-	rts
+check_vcol_end
+                    puly
+                    pulx
+                    pulb
+                    pula
+                    rts
 
-ScoreBoard:	pshd
-	pshx
-	pshy
-	ldd	#$1002	;Set cursor to beginning of line
-	std	CHPointer	
-	jsr	UpdateCursor
-;Clears Line	
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	ldx	#$20
-ScoreBoard1:	ldaa	#$00	;Clear line loop
-	jsr	LCD_Data
-	dex
-	bne	ScoreBoard1
 
-	ldd	CHPointer	;Set Cursor Back to beginning of line
-	jsr	UpdateCursor
-;Hex to Decimal	
-	ldd	Score
-	
-	ldx	#10
-	idiv
-	ldy	#NumTbl
-	leay	d,y
-	jsr	DrawScore
-	
-	xgdx	
-	ldx	#10
-	idiv	
-	ldy	#NumTbl
-	leay	d,y
-	jsr	DrawScore
-	
-	xgdx
-	ldy	#NumTbl
-	leay	d,y
-	jsr	DrawScore
-	
-	puly
-	pulx
-	puld
-	rts
+set_collision
+                    lda       #$FF
+                    sta       collision
+                    rts
 
-DrawScore:	pshx
-	ldx	d,y	;ldx with top memory address of CG number
-	pshd
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	ldy	#8
-DrawScore1:	ldaa	1,x+
-	jsr	LCD_Data
-	dey
-	bne	DrawScore1
-	puld
-	pulx
-	rts
-	
-* ======= *
-* = LCD = *
-* ======= *
+; ========= *
+; = Score = *
+; ========= *
 
-InitCurPointers:	pshd
-	ldd	#CursorInit
-	std	CPointer
-	addd    	#3
-	std	CCPointer
-        	ldd	#$0000
-	std	CSPointer
-	std	CHPointer
-	puld
-	rts
+Score_Inc           pshd
+                    ldd       Score
+                    addd      #3
+                    std       Score
+                    puld
+                    bsr       ScoreBoard
+                    rts
 
-;Draws Shape based on values in memory (void)	
-DrawShape:	pshd
-	pshx
-	pshy
-	jsr	ClearShape	;Clears Old shape
-	ldd	#CursorInit
-	addd    	#1
-	addd	stage_block_ptr
-	std	CCPointer	;Sets Cursor to correct location
-	addd	#$0400
-	std	CPointer
-	
-	ldx	block_ptr	;pointer to memory
-	
+Score_Inc_Bonus
+                    pshd
+                    ldd       Score
+                    addd      #10
+                    std       Score
+                    puld
+                    bsr       ScoreBoard
+                    rts
 
-DrawShape1:	ldd	CPointer
-	jsr	UpdateCursor
-        	ldaa	#Mwrite	;init memory write
-	jsr	LCD_Command
-	ldaa	1,x-
-	ldy	#8
-DrawShape2:	lsra
 
-	bcs     	DrawShape3
-	jsr	Blank
-	bra     	DrawShape4
-DrawShape3:     	jsr 	Square
-	bra	DrawShape4
-DrawShape4:	dey
-	bne	DrawShape2	
-	ldd	CPointer
-	xgdx
-	dex
-	xgdx
-	std	CPointer
-	TFR	x,d
-	addd	#4
-	cpd	block_ptr
-	bne	DrawShape1	
-	puly
-	pulx
-	puld
-	rts
-	
-;Clears old shape based on CCPointer which has old cursor position (void)	
-ClearShape:	pshd
-	pshx
-	pshy
-	ldd	CCPointer
-	jsr	UpdateCursor	;Set Cursor to start of shape
-	ldy	#4
-ClearShape1:    ldaa	#Mwrite
-	jsr	LCD_Command
-	ldaa	#$00
-	ldx	#$7F
-ClearShape2:	jsr	LCD_Data
-	dex
-	bne	ClearShape2
+Score_Rst           pshd
+                    clrd
+                    std       Score
+                    puld
+                    bsr       ScoreBoard
+                    rts
 
-	
-	ldd	CCPointer
-	xgdx
-	dex	
-	xgdx
-	std	CCPointer
-	jsr	UpdateCursor
-	
-	dey
-	bne	ClearShape1
-	puly
-	pulx
-	puld
-	rts
-	
-DrawStageBounds:	pshx
-	pshy
-	pshd
-	ldd	#CursorInit	;Load Starting Cursor Point on LCD for stage
-	addd	#$1000
-	dex
-	xgdx
-	
-	TFR	x,d
-	jsr	UpdateCursor
-	ldaa	#Mwrite	;Draw divide line between score board and stage
-	jsr	LCD_Command
-	ldaa	#%10111101
-	ldy	#$7F
-DrawStageBounds1:	jsr	LCD_Data
-	dey
-	bne	DrawStageBounds1
-	
-	TFR	x,d
-	addd	#17
-	jsr	UpdateCursor
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	ldaa	#%01011101
-	ldy	#$7F
-DrawStageBounds2:	jsr	LCD_Data
-	dey
-	bne	DrawStageBounds2
-	
-	ldaa	#$4C	;Curser auto inc AP+1
-	jsr	LCD_Command
-	
-	TFR	x,d
-	addd	#$03C1
-	jsr	UpdateCursor
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	ldy	#16
-DrawStageBounds3:	ldaa	#$FF
-	jsr	LCD_Data
-	dey
-	bne	DrawStageBounds3
-	
-	TFR	x,d
-	addd	#$0C21
-	jsr	UpdateCursor
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	ldy	#16
-DrawStageBounds4:	ldaa	#$FF
-	jsr	LCD_Data
-	dey
-	bne	DrawStageBounds4
-	
-	ldaa	#$4F	;Curser auto inc AP+1
-	jsr	LCD_Command
-	
-	puld
-	puly
-	pulx
-	rts
-	
-DrawStage:	pshx
-	pshy
-	pshd
-	ldd	#CursorInit	;Load Starting Cursor Point on LCD for stage
-	addd	#$1401
-	std	CSPointer	;Set CSPointer to top of stage	
-	
-	
-	ldx	#stage_beg
-DrawStage2:	ldd	CSPointer	;Update LCD Cursor for drawing blocks on stage
-	jsr	UpdateCursor
-	ldaa    	#Mwrite
-	jsr    	LCD_Command
-	ldy	#8
-	ldaa	1,x+
-DrawStage3:	lsra
-	bcs	DrawStage4	;Draw Each block on stage
-	jsr	Blank
-	bra	DrawStage5
-DrawStage4:	jsr	Square
-	bra	DrawStage5
-DrawStage5:	dey
-	bne	DrawStage3
-	ldd	CSPointer
-	xgdx
-	inx
-	xgdx
-	std	CSPointer
-	cpx	#stage_end
-	bne	DrawStage2
-	puld
-	puly
-	pulx
-	rts
+ScoreBoard          pshd
+                    pshx
+                    pshy
+                    ldd       #$1002              ; Set cursor to beginning of line
+                    std       CHPointer
+                    jsr       UpdateCursor
+; Clears Line
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    ldx       #$20
+ScoreBoard1         lda       #0                  ; Clear line loop
+                    jsr       LCD_Data
+                    dex
+                    bne       ScoreBoard1
 
-;GAME OVER
-GameOver:	pshx
-	pshy
-	pshd
-	ldd	#CursorInit
-	addd	#$1008
-	TFR	d,x
-	jsr	UpdateCursor
-	ldy	#$7F
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	
-GameOver1:	ldaa	#$00
-	jsr	LCD_Data
-	dey
-	bne	GameOver1
-	
-	TFR	x,d
-	addd	#$0360
-	jsr	UpdateCursor
-	
-	ldy	#GAME_OVER
-	ldaa	#Mwrite
-	jsr	LCD_Command
+                    ldd       CHPointer           ; Set Cursor Back to beginning of line
+                    jsr       UpdateCursor
+; Hex to Decimal
+                    ldd       Score
 
-GameOver2:	ldaa	1,y+
-	cmpa	#$FF
-	beq	GameOverEND
-	jsr	LCD_Data
-	bra	GameOver2
-GameOverEND:	puld
-	puly
-	pulx
-	rts
-	
-TetrisTitle:	pshx
-	pshy
-	pshd
-	ldd	#$1802
-	jsr	UpdateCursor
+                    ldx       #10
+                    idiv
+                    ldy       #NumTbl
+                    bsr       leay_dy
+                    bsr       DrawScore
 
-	ldy	#TETRIS
-	ldaa	#Mwrite
-	jsr	LCD_Command
+                    xgdx
+                    ldx       #10
+                    idiv
+                    ldy       #NumTbl
+                    bsr       leay_dy
+                    bsr       DrawScore
 
-TetrisTitle1:	ldaa	1,y+
-	cmpa	#$FF
-	beq	TetrisTitleEND
-	jsr	LCD_Data
-	bra	TetrisTitle1
-TetrisTitleEND:	puld
-	puly
-	pulx
-	rts
-	
-DrawPause:	pshx
-	pshy
-	pshd
-	ldd	#$0000
-	jsr	UpdateCursor
+                    xgdx
+                    ldy       #NumTbl
+                    bsr       leay_dy
+                    bsr       DrawScore
 
-	ldy	#PAUSE
-	ldaa	#Mwrite
-	jsr	LCD_Command
+                    puly
+                    pulx
+                    puld
+                    rts
 
-DrawPause1:	ldaa	1,y+
-	cmpa	#$FF
-	beq	DrawPauseEND
-	jsr	LCD_Data
-	bra	DrawPause1
-DrawPauseEND:	puld
-	puly
-	pulx
-	rts
-	
-ClearPause:	pshd
-	ldd	#$0000
-	jsr	UpdateCursor
-	ldaa	#Mwrite
-	jsr	LCD_Command
-	jsr	Blank
-	puld
-	rts
-	
+leax_dx             pshd
+                    xgdx
+                    tsx
+                    addd      ,x
+                    tdx
+                    puld
+                    rts
 
-;Requires D have cursor position (D)	
-UpdateCursor:	pshd
-	ldaa	#$46
-	jsr	LCD_Command
-	puld
-	psha
-	tba
-	jsr	LCD_Data
-	pula
-	jsr	LCD_Data
-	rts
+leay_dy             pshd
+                    xgdy
+                    tsy
+                    addd      ,y
+                    tdy
+                    puld
+                    rts
 
-;Draws single square within shape (void) *WORKING	
-Square:	psha
-	pshx
-	ldx	#8
-Square1:	ldaa	#$FF
-	jsr	LCD_Data
-	dex
-	bne	Square1
-	pulx
-	pula
-	rts
-	
-Blank:	psha
-	pshx
-	ldx	#8
-Blank1:	ldaa	#$00
-	jsr	LCD_Data
-	dex
-	bne	Blank1
-	pulx
-	pula
-	rts
+ldx_dy              pshd
+                    tyd
+                    tsx
+                    addd      ,x
+                    tdx
+                    puld
+                    rts
 
-LCD_INIT:	
-	psha
-	pshx
-	
-	ldaa	#$FF
-	staa	DDRG
-	staa	DDRH
-	staa
-	
-	ldaa	#$1F
-	staa	PORTG	;Init PORTG
-	
-	bclr	PORTG,BIT_0	;RESET LOW
-	
+DrawScore           pshx
+                    bsr       ldx_dy              ; ldx with top memory address of CG number
+                    pshd
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    ldy       #8
+DrawScore1          lda       1,x
+                    inx
+                    jsr       LCD_Data
+                    dey
+                    bne       DrawScore1
+                    puld
+                    pulx
+                    rts
+
+; ======= *
+; = LCD = *
+; ======= *
+
+InitCurPointers     pshd
+                    ldd       #CursorInit
+                    std       CPointer
+                    addd      #3
+                    std       CCPointer
+                    ldd       #$0000
+                    std       CSPointer
+                    std       CHPointer
+                    puld
+                    rts
+
+; Draws Shape based on values in memory (void)
+DrawShape           pshd
+                    pshx
+                    pshy
+                    bsr       ClearShape          ; Clears Old shape
+                    ldd       #CursorInit
+                    addd      #1
+                    addd      stage_block_ptr
+                    std       CCPointer           ; Sets Cursor to correct location
+                    addd      #$0400
+                    std       CPointer
+
+                    ldx       block_ptr           ; pointer to memory
+
+
+DrawShape1          ldd       CPointer
+                    jsr       UpdateCursor
+                    lda       #Mwrite             ; init memory write
+                    jsr       LCD_Command
+                    lda       1,x
+                    dex
+                    ldy       #8
+DrawShape2          lsra
+
+                    bcs       DrawShape3
+                    jsr       Blank
+                    bra       DrawShape4
+
+DrawShape3          jsr       Square
+; bra       DrawShape4
+DrawShape4          dey
+                    bne       DrawShape2
+                    ldd       CPointer
+                    xgdx
+                    dex
+                    xgdx
+                    std       CPointer
+                    txd
+                    addd      #4
+                    cpd       block_ptr
+                    bne       DrawShape1
+                    puly
+                    pulx
+                    puld
+                    rts
+
+; Clears old shape based on CCPointer which has old cursor position (void)
+ClearShape          pshd
+                    pshx
+                    pshy
+                    ldd       CCPointer
+                    jsr       UpdateCursor        ; Set Cursor to start of shape
+                    ldy       #4
+ClearShape1         lda       #Mwrite
+                    jsr       LCD_Command
+                    lda       #$00
+                    ldx       #$7F
+ClearShape2         jsr       LCD_Data
+                    dex
+                    bne       ClearShape2
+
+
+                    ldd       CCPointer
+                    xgdx
+                    dex
+                    xgdx
+                    std       CCPointer
+                    jsr       UpdateCursor
+
+                    dey
+                    bne       ClearShape1
+                    puly
+                    pulx
+                    puld
+                    rts
+
+DrawStageBounds     pshx
+                    pshy
+                    pshd
+                    ldd       #CursorInit         ; Load Starting Cursor Point on LCD for stage
+                    addd      #$1000
+                    dex
+                    xgdx
+
+                    txd
+                    jsr       UpdateCursor
+                    lda       #Mwrite             ; Draw divide line between score board and stage
+                    jsr       LCD_Command
+                    lda       #%10111101
+                    ldy       #$7F
+DrawStageBounds1    jsr       LCD_Data
+                    dey
+                    bne       DrawStageBounds1
+
+                    txd
+                    addd      #17
+                    jsr       UpdateCursor
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    lda       #%01011101
+                    ldy       #$7F
+DrawStageBounds2    jsr       LCD_Data
+                    dey
+                    bne       DrawStageBounds2
+
+                    lda       #$4C                ; Curser auto inc AP+1
+                    jsr       LCD_Command
+
+                    txd
+                    addd      #$03C1
+                    jsr       UpdateCursor
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    ldy       #16
+DrawStageBounds3    lda       #$FF
+                    jsr       LCD_Data
+                    dey
+                    bne       DrawStageBounds3
+
+                    txd
+                    addd      #$0C21
+                    jsr       UpdateCursor
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    ldy       #16
+DrawStageBounds4    lda       #$FF
+                    jsr       LCD_Data
+                    dey
+                    bne       DrawStageBounds4
+
+                    lda       #$4F                ; Curser auto inc AP+1
+                    jsr       LCD_Command
+
+                    puld
+                    puly
+                    pulx
+                    rts
+
+DrawStage           pshx
+                    pshy
+                    pshd
+                    ldd       #CursorInit         ; Load Starting Cursor Point on LCD for stage
+                    addd      #$1401
+                    std       CSPointer           ; Set CSPointer to top of stage
+
+
+                    ldx       #stage_beg
+DrawStage2          ldd       CSPointer           ; Update LCD Cursor for drawing blocks on stage
+                    jsr       UpdateCursor
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    ldy       #8
+                    lda       1,x
+                    inx
+DrawStage3          lsra
+                    bcs       DrawStage4          ; Draw Each block on stage
+                    jsr       Blank
+                    bra       DrawStage5
+
+DrawStage4          jsr       Square
+; bra       DrawStage5
+DrawStage5          dey
+                    bne       DrawStage3
+                    ldd       CSPointer
+                    xgdx
+                    inx
+                    xgdx
+                    std       CSPointer
+                    cpx       #stage_end
+                    bne       DrawStage2
+                    puld
+                    puly
+                    pulx
+                    rts
+
+; GAME OVER
+GameOver            pshx
+                    pshy
+                    pshd
+                    ldd       #CursorInit
+                    addd      #$1008
+                    tdx
+                    jsr       UpdateCursor
+                    ldy       #$7F
+                    lda       #Mwrite
+                    jsr       LCD_Command
+
+GameOver1           lda       #$00
+                    jsr       LCD_Data
+                    dey
+                    bne       GameOver1
+
+                    txd
+                    addd      #$0360
+                    bsr       UpdateCursor
+
+                    ldy       #GAME_OVER
+                    lda       #Mwrite
+                    jsr       LCD_Command
+
+GameOver2           lda       1,y
+                    iny
+                    cmpa      #$FF
+                    beq       GameOverEND
+                    jsr       LCD_Data
+                    bra       GameOver2
+
+GameOverEND         puld
+                    puly
+                    pulx
+                    rts
+
+TetrisTitle         pshx
+                    pshy
+                    pshd
+                    ldd       #$1802
+                    bsr       UpdateCursor
+
+                    ldy       #TETRIS
+                    lda       #Mwrite
+                    jsr       LCD_Command
+
+TetrisTitle1        lda       1,y
+                    iny
+                    cmpa      #$FF
+                    beq       TetrisTitleEND
+                    jsr       LCD_Data
+                    bra       TetrisTitle1
+
+TetrisTitleEND      puld
+                    puly
+                    pulx
+                    rts
+
+DrawPause           pshx
+                    pshy
+                    pshd
+                    ldd       #$0000
+                    bsr       UpdateCursor
+
+                    ldy       #PAUSE
+                    lda       #Mwrite
+                    jsr       LCD_Command
+
+DrawPause1          lda       1,y
+                    iny
+                    cmpa      #$FF
+                    beq       DrawPauseEND
+                    jsr       LCD_Data
+                    bra       DrawPause1
+
+DrawPauseEND        puld
+                    puly
+                    pulx
+                    rts
+
+ClearPause          pshd
+                    ldd       #$0000
+                    bsr       UpdateCursor
+                    lda       #Mwrite
+                    jsr       LCD_Command
+                    bsr       Blank
+                    puld
+                    rts
+
+
+; Requires D have cursor position (D)
+UpdateCursor        pshd
+                    lda       #$46
+                    jsr       LCD_Command
+                    puld
+                    psha
+                    tba
+                    jsr       LCD_Data
+                    pula
+                    jsr       LCD_Data
+                    rts
+
+; Draws single square within shape (void) *WORKING
+Square              psha
+                    pshx
+                    ldx       #8
+Square1             lda       #$FF
+                    jsr       LCD_Data
+                    dex
+                    bne       Square1
+                    pulx
+                    pula
+                    rts
+
+Blank               psha
+                    pshx
+                    ldx       #8
+Blank1              lda       #$00
+                    jsr       LCD_Data
+                    dex
+                    bne       Blank1
+                    pulx
+                    pula
+                    rts
+
+LCD_INIT
+                    psha
+                    pshx
+
+                    lda       #$FF
+                    sta       DDRG
+                    sta       DDRH
+; sta 
+
+                    lda       #$1F
+                    sta       PORTG               ; Init PORTG
+
+                    bclr      PORTG,BIT_0         ; RESET LOW
+
 ;***************** Need 3ms Delay
-	ldx	#$FFFF
-LCD_INIT_LOOP1:	dex	
-	bne	LCD_INIT_LOOP1	
+                    ldx       #$FFFF
+LCD_INIT_LOOP1      dex
+                    bne       LCD_INIT_LOOP1
 
-	bset	PORTG,BIT_0	;Reset Complete PORTG
-	
-	ldx	#$FFFF
-LCD_INIT_LOOP2:	dex
-	bne	LCD_INIT_LOOP2
-	
-	ldaa	#$58	;Turn off Display
-	jsr	LCD_Command
+                    bset      PORTG,BIT_0         ; Reset Complete PORTG
 
-*Init Setup	
-	ldaa	#$40
-	jsr 	LCD_Command
-	ldaa	#$30	
-	jsr	LCD_Data
-	ldaa	#$87	;8-2 frame AC Drive 7 - Char Width FX
-	jsr	LCD_Data
-	ldaa	#$07	;Char Height FY
-	jsr	LCD_Data
-	ldaa	#$1F	;32 Diplay bites per line
-	jsr	LCD_Data
-	ldaa	#$23	;Total addr range per line TC/R (C/R+4 H-Blanking)
-	jsr	LCD_Data
-	ldaa	#$7F	; 128 diplay lines L/F
-	jsr	LCD_Data
-	ldaa	#$20	;Low Bite APL (Virtual Screen)
-	jsr	LCD_Data
-	ldaa	#$00	;High Bite APL (Virtual Screen)
-	jsr	LCD_Data
+                    ldx       #$FFFF
+LCD_INIT_LOOP2      dex
+                    bne       LCD_INIT_LOOP2
 
-*Scorll Settings	
-	ldaa	#$44	;Set Scroll Command
-	jsr	LCD_Command
-	ldaa	#$00	;Layer 1 Start Address
-	jsr	LCD_Data	;Lower byte
-	ldaa	#$00
-	jsr	LCD_Data	;High byte
-	ldaa	#$7F	
-	jsr	LCD_Data	;128 lines
-	ldaa	#$00	;Layer 2 Start Address
-	jsr	LCD_Data	;Lower byte
-	ldaa	#$10	
-	jsr	LCD_Data	;High byte
-	ldaa	#$7F	
-	jsr	LCD_Data	;128 lines
-	ldaa	#$00
-	jsr	LCD_Data	;Layer 3 Start Address
-	ldaa	#$20
-	jsr	LCD_Data	;High byte
-	ldaa	#$7F
-	jsr	LCD_Data	;128 lines
+                    lda       #$58                ; Turn off Display
+                    jsr       LCD_Command
 
-*Horizonal Scroll Set	
-	ldaa	#$5A	;Horizonal Scroll CMD
-	jsr	LCD_Command
-	ldaa	#$00	;At Origin on X
-	jsr	LCD_Data
-*Overlay Settings	
-	ldaa	#$5B
-	jsr	LCD_Command	;Overlay CMD
-	ldaa	#$1C
-	jsr	LCD_Data	;3 layers, Graphics,OR layers
+; *Init Setup
+                    lda       #$40
+                    jsr       LCD_Command
+                    lda       #$30
+                    jsr       LCD_Data
+                    lda       #$87                ; 8-2 frame AC Drive 7 - Char Width FX
+                    jsr       LCD_Data
+                    lda       #$07                ; Char Height FY
+                    jsr       LCD_Data
+                    lda       #$1F                ; 32 Diplay bites per line
+                    jsr       LCD_Data
+                    lda       #$23                ; Total addr range per line TC/R (C/R+4 H-Blanking)
+                    jsr       LCD_Data
+                    lda       #$7F                ; 128 diplay lines L/F
+                    jsr       LCD_Data
+                    lda       #$20                ; Low Bite APL (Virtual Screen)
+                    jsr       LCD_Data
+                    lda       #$00                ; High Bite APL (Virtual Screen)
+                    bsr       LCD_Data
 
-*Set Cursor increment to increment for memory clear	
-	ldaa	#$4C	;Curser auto inc AP+1
-	jsr	LCD_Command
-	
-*Set Cursor location
-	ldaa	#$46
-	jsr	LCD_Command	;Set Cursor
-	clra
-	jsr	LCD_Data	;to 0000h
-	clra
-	jsr	LCD_Data
+; *Scorll Settings
+                    lda       #$44                ; Set Scroll Command
+                    bsr       LCD_Command
+                    lda       #$00                ; Layer 1 Start Address
+                    bsr       LCD_Data            ; Lower byte
+                    lda       #$00
+                    bsr       LCD_Data            ; High byte
+                    lda       #$7F
+                    bsr       LCD_Data            ; 128 lines
+                    lda       #$00                ; Layer 2 Start Address
+                    bsr       LCD_Data            ; Lower byte
+                    lda       #$10
+                    bsr       LCD_Data            ; High byte
+                    lda       #$7F
+                    bsr       LCD_Data            ; 128 lines
+                    lda       #$00
+                    bsr       LCD_Data            ; Layer 3 Start Address
+                    lda       #$20
+                    bsr       LCD_Data            ; High byte
+                    lda       #$7F
+                    bsr       LCD_Data            ; 128 lines
 
+; *Horizonal Scroll Set
+                    lda       #$5A                ; Horizonal Scroll CMD
+                    bsr       LCD_Command
+                    lda       #$00                ; At Origin on X
+                    bsr       LCD_Data
+; *Overlay Settings
+                    lda       #$5B
+                    bsr       LCD_Command         ; Overlay CMD
+                    lda       #$1C
+                    bsr       LCD_Data            ; 3 layers, Graphics,OR layers
 
-*Clear Memeory
-	ldx	#$0000
-	ldaa	#$42
-	jsr	LCD_Command
-	
-INIT_L2_RAM:	ldaa	#$00	;Zero
-	jsr	LCD_Data
-	inx	
-	cpx	#$3000
-	bne	INIT_L2_RAM
-	
-*Set Cursor increment to increment for program	
-	ldaa	#$4F	;Curser auto inc AP+1
-	jsr	LCD_Command
-	
-*Turn on Display	
-	ldaa	#$59
-	jsr	LCD_Command	;Display On
-	ldaa	#%00010100	;Layer 1,2 on layer 3,4, curser off
-	jsr	LCD_Data
-*Set CGRAM
-;	ldaa	#$5C
-;	jsr	LCD_Command
-;	ldaa	#$00
-;	jsr	LCD_Data
-;	ldaa	#$04
-;	jsr	LCD_Data
-	
-	pulx
-	pula
-	rts
+; *Set Cursor increment to increment for memory clear
+                    lda       #$4C                ; Curser auto inc AP+1
+                    bsr       LCD_Command
 
-;PORTG
-;bit0 - /Reset
-;bit1 - /Read
-;bit2 - /Write
-;bit3 - /CS
-;bit4 - A0
-	
-LCD_Command:
-	pshb
-	bset	PORTG,BIT_4	;Set A0
-	staa	PORTH	;Write Command
-	bset	PORTG,BIT_1	;Read disabled
-	bclr	PORTG,BIT_3	;CS enabled
-	bclr	PORTG,BIT_2	;Write enabled
-	movb	#$FF,PORTG	;Restore PG
-	pulb
-	rts
-	
-LCD_Data:	
-	pshb
-	bclr	PORTG,BIT_4	;Clear A0
-	staa	PORTH	;Write Data
-	bset	PORTG,BIT_1	;Read disabled
-	bclr	PORTG,BIT_3	;CS enabled
-	bclr	PORTG,BIT_2	;Write enabled
-	movb	#$FF,PORTG	;Restore PG
-	pulb
-	rts
-
-* ========
-* = ISRs =
-* ========
-
-* this ISR moves the block down one space periodically
-ISR_Timer1:
-	pshd
-	pshx
-	pshy
-	pshc			
- 	jsr	move_down	;******************Currently does not inc stage_block_ptr
-	jsr	DrawShape
-	ldaa	TFLG1
-	anda	#$02	;Reset Flag
-	staa	TFLG1
-	pulc
-	puly
-	pulx
-	puld
-	rti
-	
-ISR_Timer2:	pshd
-	pshx
-	pshy
-	pshc
-	jsr	DrawShape
-	ldd	TCNT
-	addd	#$0FFF
-	std	TC2
-	ldaa	TFLG1
-	anda	#$04
-	staa	TFLG1
-	pulc
-	puly
-	pulx
-	puld
-	rti
-
-	
-* ==========
-* = Blocks =
-* ==========
-BLK_squareU	fcb	$C0,$C0,0,0
-BLK_squareL	fcb	$C0,$C0,0,0
-BLK_squareD	fcb	$C0,$C0,0,0
-BLK_squareR	fcb	$C0,$C0,0,0
-BLK_teeU	fcb	$40,$E0,0,0
-BLK_teeL	fcb	$40,$C0,$40,0
-BLK_teeD	fcb	$E0,$40,0,0
-BLK_teeR	fcb	$80,$C0,$80,0
-BLK_longU	fcb	$F0,0,0,0
-BLK_longL	fcb	$80,$80,$80,$80
-BLK_longD	fcb	$F0,0,0,0
-BLK_longR	fcb	$80,$80,$80,$80
-BLK_ZU	fcb	$C0,$60,0,0
-BLK_ZL	fcb	$40,$C0,$80,0
-BLK_ZD	fcb	$C0,$60,0,0
-BLK_ZR	fcb	$40,$C0,$80,0
-BLK_ZiU	fcb	$60,$C0,0,0
-BLK_ZiL	fcb	$80,$C0,$40,0
-BLK_ZiD	fcb	$60,$C0,0,0
-BLK_ZiR	fcb	$80,$C0,$40,0
-BLK_LU	fcb	$E0,$80,0,0
-BLK_LL	fcb	$80,$80,$C0,0
-BLK_LD	fcb	$20,$E0,0,0
-BLK_LR	fcb	$C0,$40,$40,0
-BLK_LiU	fcb	$E0,$20,0,0
-BLK_LiL	fcb	$C0,$80,$80,0
-BLK_LiD	fcb	$80,$E0,0,0
-BLK_LiR	fcb	$40,$40,$C0,0
+; *Set Cursor location
+                    lda       #$46
+                    bsr       LCD_Command         ; Set Cursor
+                    clra
+                    bsr       LCD_Data            ; to 0000h
+                    clra
+                    bsr       LCD_Data
 
 
-* vanilla blocks. we never touch those.
-BLK_van_squareU	fcb	$C0,$C0,0,0
-BLK_van_squareL	fcb	$C0,$C0,0,0
-BLK_van_squareD	fcb	$C0,$C0,0,0
-BLK_van_squareR	fcb	$C0,$C0,0,0
-BLK_van_teeU	fcb	$40,$E0,0,0
-BLK_van_teeL	fcb	$40,$C0,$40,0
-BLK_van_teeD	fcb	$E0,$40,0,0
-BLK_van_teeR	fcb	$80,$C0,$80,0
-BLK_van_longU	fcb	$F0,0,0,0
-BLK_van_longL	fcb	$80,$80,$80,$80
-BLK_van_longD	fcb	$F0,0,0,0
-BLK_van_longR	fcb	$80,$80,$80,$80
-BLK_van_ZU	fcb	$C0,$60,0,0
-BLK_van_ZL	fcb	$40,$C0,$80,0
-BLK_van_ZD	fcb	$C0,$60,0,0
-BLK_van_ZR	fcb	$40,$C0,$80,0
-BLK_van_ZiU	fcb	$60,$C0,0,0
-BLK_van_ZiL	fcb	$80,$C0,$40,0
-BLK_van_ZiD	fcb	$60,$C0,0,0
-BLK_van_ZiR	fcb	$80,$C0,$40,0
-BLK_van_LU	fcb	$E0,$80,0,0
-BLK_van_LL	fcb	$80,$80,$C0,0
-BLK_van_LD	fcb	$20,$E0,0,0
-BLK_van_LR	fcb	$C0,$40,$40,0
-BLK_van_LiU	fcb	$E0,$20,0,0
-BLK_van_LiL	fcb	$C0,$80,$80,0
-BLK_van_LiD	fcb	$80,$E0,0,0
-BLK_van_LiR	fcb	$40,$40,$C0,0
-	
-* ================== */
-* = LCD CHAR TABLE = */
-* ================== */
+; *Clear Memeory
+                    ldx       #$0000
+                    lda       #$42
+                    bsr       LCD_Command
+
+INIT_L2_RAM         lda       #$00                ; Zero
+                    bsr       LCD_Data
+                    inx
+                    cpx       #$3000
+                    bne       INIT_L2_RAM
+
+; *Set Cursor increment to increment for program
+                    lda       #$4F                ; Curser auto inc AP+1
+                    bsr       LCD_Command
+
+; *Turn on Display
+                    lda       #$59
+                    bsr       LCD_Command         ; Display On
+                    lda       #%00010100          ; Layer 1,2 on layer 3,4, curser off
+                    bsr       LCD_Data
+; *Set CGRAM
+; lda     #$5C
+; jsr     LCD_Command
+; lda     #$00
+; jsr     LCD_Data
+; lda     #$04
+; jsr     LCD_Data
+
+                    pulx
+                    pula
+                    rts
+
+; PORTG
+; bit0 - /Reset
+; bit1 - /Read
+; bit2 - /Write
+; bit3 - /CS
+; bit4 - A0
+
+LCD_Command
+                    pshb
+                    bset      PORTG,BIT_4         ; Set A0
+                    sta       PORTH               ; Write Command
+                    bset      PORTG,BIT_1         ; Read disabled
+                    bclr      PORTG,BIT_3         ; CS enabled
+                    bclr      PORTG,BIT_2         ; Write enabled
+                    ldb       #$FF
+                    stb       PORTG               ; Restore PG
+                    pulb
+                    rts
+
+LCD_Data
+                    pshb
+                    bclr      PORTG,BIT_4         ; Clear A0
+                    sta       PORTH               ; Write Data
+                    bset      PORTG,BIT_1         ; Read disabled
+                    bclr      PORTG,BIT_3         ; CS enabled
+                    bclr      PORTG,BIT_2         ; Write enabled
+                    ldb       #$FF
+                    stb       PORTG               ; Restore PG
+                    pulb
+                    rts
+
+; ========
+; = ISRs =
+; ========
+
+; this ISR moves the block down one space periodically
+ISR_Timer1
+                    pshd
+                    pshx
+                    pshy
+                    pshcc
+                    jsr       move_down           ;******************Currently does not inc stage_block_ptr
+                    jsr       DrawShape
+                    lda       TFLG1
+                    anda      #$02                ; Reset Flag
+                    sta       TFLG1
+                    pulcc
+                    puly
+                    pulx
+                    puld
+                    rti
+
+ISR_Timer2          pshd
+                    pshx
+                    pshy
+                    pshcc
+                    jsr       DrawShape
+                    ldd       TCNT
+                    addd      #$0FFF
+                    std       TC2
+                    lda       TFLG1
+                    anda      #$04
+                    sta       TFLG1
+                    pulcc
+                    puly
+                    pulx
+                    puld
+                    rti
 
 
-Zero:	fcb	$00
-	fcb	$00
-	fcb	$7C	;01111100
-	fcb	$A2	;10100010
-	fcb	$92	;10010010
-	fcb	$8A	;10001010
-	fcb	$7C	;01111100
-	fcb	$00
-	
-One:	fcb	$00
-	fcb	$00
-	fcb	$00
-	fcb	$01
-	fcb	$FE
-	fcb	$42
-	fcb	$00
-	fcb	$00
-	
-Two:	fcb	$00
-	fcb	$00
-	fcb	$42
-	fcb	$A2
-	fcb	$92
-	fcb	$8A
-	fcb	$46
-	fcb	$00
-	
-Three:	fcb	$00
-	fcb	$00
-	fcb	$8C
-	fcb	$D2
-	fcb	$A2
-	fcb	$82
-	fcb	$84
-	fcb	$00
-	
-Four:	fcb	$00
-	fcb	$00
-	fcb	$08
-	fcb	$FE
-	fcb	$48
-	fcb	$28
-	fcb	$18
-	fcb	$00
-	
-Five:	fcb	$00
-	fcb	$00
-	fcb	$9C
-	fcb	$A2
-	fcb	$A2
-	fcb	$A2
-	fcb	$E4
-	fcb	$00
-	
-Six:	fcb	$00
-	fcb	$00
-	fcb	$0C
-	fcb	$92
-	fcb	$92
-	fcb	$52
-	fcb	$3C
-	fcb	$00
-	
-Seven:	fcb	$00
-	fcb	$00
-	fcb	$C0
-	fcb	$A0
-	fcb	$90
-	fcb	$8E
-	fcb	$80
-	fcb	$00
-	
-Eight:	fcb	$00
-	fcb	$00
-	fcb	$6C
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$6C
-	fcb	$00
-	
-Nine:	fcb	$00
-	fcb	$00
-	fcb	$78
-	fcb	$94
-	fcb	$92
-	fcb	$92
-	fcb	$60
-	fcb	$00
-	
-TETRIS:	fcb	$00	;S
-	fcb	$00
-	fcb	$4C
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$64
-	fcb	$00
-	
-	fcb	$00	;I
-	fcb	$00
-	fcb	$00
-	fcb	$82
-	fcb	$fe
-	fcb	$82
-	fcb	$00
-	fcb	$00
-	
-	fcb	$00	;R
-	fcb	$00
-	fcb	$62
-	fcb	$94
-	fcb	$98
-	fcb	$90
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;T
-	fcb	$00
-	fcb	$80
-	fcb	$80
-	fcb	$fe
-	fcb	$80
-	fcb	$80
-	fcb	$00
-	
-	fcb	$00	;E
-	fcb	$00
-	fcb	$82
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;T
-	fcb	$00
-	fcb	$80
-	fcb	$80
-	fcb	$fe
-	fcb	$80
-	fcb	$80
-	fcb	$00
-	
-	fcb	$FF	;END
-	
-GAME_OVER:	fcb	$00	;R
-	fcb	$00
-	fcb	$62
-	fcb	$94
-	fcb	$98
-	fcb	$90
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;E
-	fcb	$00
-	fcb	$82
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;V
-	fcb	$00
-	fcb	$f8
-	fcb	$04
-	fcb	$02
-	fcb	$04
-	fcb	$f8
-	fcb	$00
-	
-	fcb	$00	;O
-	fcb	$00
-	fcb	$7C
-	fcb	$82
-	fcb	$82
-	fcb	$82
-	fcb	$7C
-	fcb	$00
-	
-	fcb	$00	;Space
-	fcb	$00
-	fcb	$00
-	fcb	$00
-	fcb	$00
-	fcb	$00
-	fcb	$00
-	fcb	$00
-	
-	fcb	$00	;E
-	fcb	$00
-	fcb	$82
-	fcb	$92
-	fcb	$92
-	fcb	$92
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;M
-	fcb	$00
-	fcb	$FE
-	fcb	$40
-	fcb	$30
-	fcb	$40
-	fcb	$fe
-	fcb	$00
-	
-	fcb	$00	;A
-	fcb	$00
-	fcb	$7e
-	fcb	$88
-	fcb	$88
-	fcb	$88
-	fcb	$7e
-	fcb	$00
-	
-	fcb	$00	;G
-	fcb	$00
-	fcb	$5e
-	fcb	$92
-	fcb	$92
-	fcb	$82
-	fcb	$7c
-	fcb	$00
-	
-	fcb	$FF	;END
-	
-PAUSE:	fcb	$00	;P
-	fcb	$00
-	fcb	$60
-	fcb	$90
-	fcb	$90
-	fcb	$90
-	fcb	$FE
-	fcb	$00
-	
-	fcb	$FF	;END
-	
-	org	$2500
-NumTbl:	fdb	#Zero,#One,#Two,#Three,#Four,#Five,#Six,#Seven,#Eight,#Nine
+; ==========
+; = Blocks =
+; ==========
+BLK_squareU         fcb       $C0,$C0,0,0
+BLK_squareL         fcb       $C0,$C0,0,0
+BLK_squareD         fcb       $C0,$C0,0,0
+BLK_squareR         fcb       $C0,$C0,0,0
+BLK_teeU            fcb       $40,$E0,0,0
+BLK_teeL            fcb       $40,$C0,$40,0
+BLK_teeD            fcb       $E0,$40,0,0
+BLK_teeR            fcb       $80,$C0,$80,0
+BLK_longU           fcb       $F0,0,0,0
+BLK_longL           fcb       $80,$80,$80,$80
+BLK_longD           fcb       $F0,0,0,0
+BLK_longR           fcb       $80,$80,$80,$80
+BLK_ZU              fcb       $C0,$60,0,0
+BLK_ZL              fcb       $40,$C0,$80,0
+BLK_ZD              fcb       $C0,$60,0,0
+BLK_ZR              fcb       $40,$C0,$80,0
+BLK_ZiU             fcb       $60,$C0,0,0
+BLK_ZiL             fcb       $80,$C0,$40,0
+BLK_ZiD             fcb       $60,$C0,0,0
+BLK_ZiR             fcb       $80,$C0,$40,0
+BLK_LU              fcb       $E0,$80,0,0
+BLK_LL              fcb       $80,$80,$C0,0
+BLK_LD              fcb       $20,$E0,0,0
+BLK_LR              fcb       $C0,$40,$40,0
+BLK_LiU             fcb       $E0,$20,0,0
+BLK_LiL             fcb       $C0,$80,$80,0
+BLK_LiD             fcb       $80,$E0,0,0
+BLK_LiR             fcb       $40,$40,$C0,0
 
-* ===========
-* = Vectors =
-* ===========
-	org	$62c
-	fdb	ISR_Timer1
-	
-	org	$62a
-	fdb	ISR_Timer2
+
+; vanilla blocks. we never touch those.
+BLK_van_squareU     fcb       $C0,$C0,0,0
+BLK_van_squareL     fcb       $C0,$C0,0,0
+BLK_van_squareD     fcb       $C0,$C0,0,0
+BLK_van_squareR     fcb       $C0,$C0,0,0
+BLK_van_teeU        fcb       $40,$E0,0,0
+BLK_van_teeL        fcb       $40,$C0,$40,0
+BLK_van_teeD        fcb       $E0,$40,0,0
+BLK_van_teeR        fcb       $80,$C0,$80,0
+BLK_van_longU       fcb       $F0,0,0,0
+BLK_van_longL       fcb       $80,$80,$80,$80
+BLK_van_longD       fcb       $F0,0,0,0
+BLK_van_longR       fcb       $80,$80,$80,$80
+BLK_van_ZU          fcb       $C0,$60,0,0
+BLK_van_ZL          fcb       $40,$C0,$80,0
+BLK_van_ZD          fcb       $C0,$60,0,0
+BLK_van_ZR          fcb       $40,$C0,$80,0
+BLK_van_ZiU         fcb       $60,$C0,0,0
+BLK_van_ZiL         fcb       $80,$C0,$40,0
+BLK_van_ZiD         fcb       $60,$C0,0,0
+BLK_van_ZiR         fcb       $80,$C0,$40,0
+BLK_van_LU          fcb       $E0,$80,0,0
+BLK_van_LL          fcb       $80,$80,$C0,0
+BLK_van_LD          fcb       $20,$E0,0,0
+BLK_van_LR          fcb       $C0,$40,$40,0
+BLK_van_LiU         fcb       $E0,$20,0,0
+BLK_van_LiL         fcb       $C0,$80,$80,0
+BLK_van_LiD         fcb       $80,$E0,0,0
+BLK_van_LiR         fcb       $40,$40,$C0,0
+
+; ================== */
+; = LCD CHAR TABLE = */
+; ================== */
+
+
+Zero                fcb       $00
+                    fcb       $00
+                    fcb       $7C                 ; 01111100
+                    fcb       $A2                 ; 10100010
+                    fcb       $92                 ; 10010010
+                    fcb       $8A                 ; 10001010
+                    fcb       $7C                 ; 01111100
+                    fcb       $00
+
+One                 fcb       $00
+                    fcb       $00
+                    fcb       $00
+                    fcb       $01
+                    fcb       $FE
+                    fcb       $42
+                    fcb       $00
+                    fcb       $00
+
+Two                 fcb       $00
+                    fcb       $00
+                    fcb       $42
+                    fcb       $A2
+                    fcb       $92
+                    fcb       $8A
+                    fcb       $46
+                    fcb       $00
+
+Three               fcb       $00
+                    fcb       $00
+                    fcb       $8C
+                    fcb       $D2
+                    fcb       $A2
+                    fcb       $82
+                    fcb       $84
+                    fcb       $00
+
+Four                fcb       $00
+                    fcb       $00
+                    fcb       $08
+                    fcb       $FE
+                    fcb       $48
+                    fcb       $28
+                    fcb       $18
+                    fcb       $00
+
+Five                fcb       $00
+                    fcb       $00
+                    fcb       $9C
+                    fcb       $A2
+                    fcb       $A2
+                    fcb       $A2
+                    fcb       $E4
+                    fcb       $00
+
+Six                 fcb       $00
+                    fcb       $00
+                    fcb       $0C
+                    fcb       $92
+                    fcb       $92
+                    fcb       $52
+                    fcb       $3C
+                    fcb       $00
+
+Seven               fcb       $00
+                    fcb       $00
+                    fcb       $C0
+                    fcb       $A0
+                    fcb       $90
+                    fcb       $8E
+                    fcb       $80
+                    fcb       $00
+
+Eight               fcb       $00
+                    fcb       $00
+                    fcb       $6C
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $6C
+                    fcb       $00
+
+Nine                fcb       $00
+                    fcb       $00
+                    fcb       $78
+                    fcb       $94
+                    fcb       $92
+                    fcb       $92
+                    fcb       $60
+                    fcb       $00
+
+TETRIS              fcb       $00                 ; S
+                    fcb       $00
+                    fcb       $4C
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $64
+                    fcb       $00
+
+                    fcb       $00                 ; I
+                    fcb       $00
+                    fcb       $00
+                    fcb       $82
+                    fcb       $fe
+                    fcb       $82
+                    fcb       $00
+                    fcb       $00
+
+                    fcb       $00                 ; R
+                    fcb       $00
+                    fcb       $62
+                    fcb       $94
+                    fcb       $98
+                    fcb       $90
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; T
+                    fcb       $00
+                    fcb       $80
+                    fcb       $80
+                    fcb       $fe
+                    fcb       $80
+                    fcb       $80
+                    fcb       $00
+
+                    fcb       $00                 ; E
+                    fcb       $00
+                    fcb       $82
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; T
+                    fcb       $00
+                    fcb       $80
+                    fcb       $80
+                    fcb       $fe
+                    fcb       $80
+                    fcb       $80
+                    fcb       $00
+
+                    fcb       $FF                 ; END
+
+GAME_OVER           fcb       $00                 ; R
+                    fcb       $00
+                    fcb       $62
+                    fcb       $94
+                    fcb       $98
+                    fcb       $90
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; E
+                    fcb       $00
+                    fcb       $82
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; V
+                    fcb       $00
+                    fcb       $f8
+                    fcb       $04
+                    fcb       $02
+                    fcb       $04
+                    fcb       $f8
+                    fcb       $00
+
+                    fcb       $00                 ; O
+                    fcb       $00
+                    fcb       $7C
+                    fcb       $82
+                    fcb       $82
+                    fcb       $82
+                    fcb       $7C
+                    fcb       $00
+
+                    fcb       $00                 ; Space
+                    fcb       $00
+                    fcb       $00
+                    fcb       $00
+                    fcb       $00
+                    fcb       $00
+                    fcb       $00
+                    fcb       $00
+
+                    fcb       $00                 ; E
+                    fcb       $00
+                    fcb       $82
+                    fcb       $92
+                    fcb       $92
+                    fcb       $92
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; M
+                    fcb       $00
+                    fcb       $FE
+                    fcb       $40
+                    fcb       $30
+                    fcb       $40
+                    fcb       $fe
+                    fcb       $00
+
+                    fcb       $00                 ; A
+                    fcb       $00
+                    fcb       $7e
+                    fcb       $88
+                    fcb       $88
+                    fcb       $88
+                    fcb       $7e
+                    fcb       $00
+
+                    fcb       $00                 ; G
+                    fcb       $00
+                    fcb       $5e
+                    fcb       $92
+                    fcb       $92
+                    fcb       $82
+                    fcb       $7c
+                    fcb       $00
+
+                    fcb       $FF                 ; END
+
+PAUSE               fcb       $00                 ; P
+                    fcb       $00
+                    fcb       $60
+                    fcb       $90
+                    fcb       $90
+                    fcb       $90
+                    fcb       $FE
+                    fcb       $00
+
+                    fcb       $FF                 ; END
+
+                    org       $2500
+NumTbl              fdb       Zero,One,Two,Three,Four,Five,Six,Seven,Eight,Nine
+
+; ===========
+; = Vectors =
+; ===========
+                    org       $62c
+                    fdb       ISR_Timer1
+
+                    org       $62a
+                    fdb       ISR_Timer2
