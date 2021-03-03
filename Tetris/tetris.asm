@@ -1,28 +1,29 @@
                     #CaseOn
 
-SP0CR1              equ       $08D0               ; SPI Control
-SP0SR               equ       $08D3               ; SPI Status
-SP0DR               equ       $08D5               ; SPI Data
-SP0BR               equ       $08D2               ; BAUD register
-DDRS                equ       $08D7
-PORTS               equ       $08D6
+REGS                equ       $0800
+SP0CR1              equ       REGS+$D0            ; SPI Control
+SP0SR               equ       REGS+$D3            ; SPI Status
+SP0DR               equ       REGS+$D5            ; SPI Data
+SP0BR               equ       REGS+$D2            ; BAUD register
+DDRS                equ       REGS+$D7
+PORTS               equ       REGS+$D6
 
-SC0SR1              equ       $08C4
-SC0DRL              equ       $08C7
+SC0SR1              equ       REGS+$C4
+SC0DRL              equ       REGS+$C7
 
-PORTG               equ       $0828               ; Expanded Address of Command
-DDRG                equ       $082A
-PORTH               equ       $0829               ; Expanded Address of Data
-DDRH                equ       $082B
+PORTG               equ       REGS+$28            ; Expanded Address of Command
+DDRG                equ       REGS+$2A
+PORTH               equ       REGS+$29            ; Expanded Address of Data
+DDRH                equ       REGS+$2B
 
-TIOS                equ       $0880               ; In/Out
-TCNT                equ       $0884               ; CNT High
-TSCR                equ       $0886               ; Control
-TMSK1               equ       $088C               ; Enable flag
-TMSK2               equ       $088D               ; prescaler
-TFLG1               equ       $088E               ; Flags
-TC1                 equ       $0892               ; CNT Set
-TC2                 equ       $0894
+TIOS                equ       REGS+$80            ; In/Out
+TCNT                equ       REGS+$84            ; CNT High
+TSCR                equ       REGS+$86            ; Control
+TMSK1               equ       REGS+$8C            ; Enable flag
+TMSK2               equ       REGS+$8D            ; prescaler
+TFLG1               equ       REGS+$8E            ; Flags
+TC1                 equ       REGS+$92            ; CNT Set
+TC2                 equ       REGS+$94
 
 BIT_0               equ       1                   ; /RESET
 BIT_1               equ       2                   ; /READ
@@ -287,11 +288,11 @@ _4@@                bsr       Pad_En
 ; Toggles Pad SS
 
 Pad_En              proc
-                    pshb
-                    ldb       PORTS               ; Load Current State of PORTS
-                    eorb      #$80                ; Toggle Slave Select
-                    stb       PORTS               ; Store back
-                    pulb
+                    psha
+                    lda       PORTS               ; Load Current State of PORTS
+                    eora      #$80                ; Toggle Slave Select
+                    sta       PORTS               ; Store back
+                    pula
                     rts
 
 ;*******************************************************************************
@@ -299,13 +300,11 @@ Pad_En              proc
 ; Out: {B} with what's returned
 
 Pad_RW              proc
-                    psha
                     stb       SP0DR               ; Store {B} to send to pad
 Loop@@              ldb       SP0SR               ; Reads Pad Status Register
                     andb      #$80                ; Checks for status high on bit 7
                     beq       Loop@@              ; Checks again if not high
                     ldb       SP0DR               ; Pulls data from Pad
-                    pula
                     rts
 
 
@@ -318,14 +317,14 @@ Loop@@              ldb       SP0SR               ; Reads Pad Status Register
 
 MoveLeft            proc
                     pshx
-                    pshb
+                    psha
                     ldx       block_ptr
-                    ldb       block_height
+                    lda       block_height
 Loop@@              lsl       ,x
                     dex
-                    decb
+                    deca
                     bne       Loop@@
-                    pulb
+                    pula
                     pulx
                     rts
 
@@ -334,14 +333,14 @@ Loop@@              lsl       ,x
 
 MoveRight           proc
                     pshx
-                    pshb
+                    psha
                     ldx       block_ptr
-                    ldb       block_height
+                    lda       block_height
 Loop@@              lsr       ,x
                     dex
-                    decb
+                    deca
                     bne       Loop@@
-                    pulb
+                    pula
                     pulx
                     rts
 
@@ -378,22 +377,20 @@ move_down           proc
                     cmpa      #$FF
 ; if we have a collision, merge block into the stage.
 ; else increment stage block pointer
-                    beq       move_down_2
+                    beq       _2@@
                     ldd       stage_block_ptr
                     incb
                     std       stage_block_ptr
-                    bra       move_down_end
+                    bra       Done@@
 
-move_down_2
-                    bsr       merge_blk2stg
+_2@@                bsr       merge_blk2stg
                     bsr       clr_fl_rws
                     jsr       DrawStage
                     bsr       CheckGameOver
-move_down_3
+
                     jsr       DetermineBlock
                     jsr       ServeBlock
-move_down_end
-                    rts
+Done@@              rts
 
 ;*******************************************************************************
 
@@ -437,13 +434,7 @@ Loop@@    ;-------------------------------------- ; see if the current row is fu
                     cmpa      #$FF
           ;-------------------------------------- ; if not, move on, else, do some stuff
                     bne       _3@@
-          ;-------------------------------------- ; transfer X to Y and work with it for the internal loop
-                    pshx
-                    pshd
-                    xgdx
-                    xgdy
-                    puld
-                    pulx
+                    txy                           ; transfer X to Y and work with it for the internal loop
           ;-------------------------------------- ; also increase the score
                     jsr       Score_Inc
                     incb
@@ -519,7 +510,6 @@ DetermineBlock      proc
 ServeBlock          proc
 ; shift the block back to initial position. Then, later, we
 ; move it forward again to the right spot.
-;
                     lda       shift_offset
 Loop@@              beq       _1@@
                     jsr       MoveLeft
@@ -960,9 +950,7 @@ _2@@                jsr       Square
 _3@@                dey
                     bne       _1@@
                     ldd       CPointer
-                    xgdx
-                    dex
-                    xgdx
+                    decd
                     std       CPointer
                     txd
                     addd      #4
@@ -991,9 +979,7 @@ _1@@                jsr       LCD_Data
                     dex
                     bne       _1@@
                     ldd       CCPointer
-                    xgdx
-                    dex
-                    xgdx
+                    decd
                     std       CCPointer
                     jsr       UpdateCursor
                     dey
@@ -1086,9 +1072,7 @@ _2@@                jsr       Square
 _3@@                dey
                     bne       _1@@
                     ldd       CSPointer
-                    xgdx
-                    inx
-                    xgdx
+                    incd
                     std       CSPointer
                     cpx       #stage_end
                     bne       Loop@@
@@ -1255,13 +1239,16 @@ LCD_INIT            proc
                     lda       #$1F
                     sta       PORTG               ; Init PORTG
 
-                    bclr      PORTG,BIT_0         ; RESET LOW
+                    ldx       #REGS
+                    bclr      [PORTG,x,BIT_0      ; RESET LOW
           ;-------------------------------------- ; Need 3ms Delay
+                    pshx
                     ldx       #$FFFF
 _1@@                dex
                     bne       _1@@
-
-                    bset      PORTG,BIT_0         ; Reset Complete PORTG
+                    pulx
+          ;--------------------------------------
+                    bset      [PORTG,x,BIT_0      ; Reset Complete PORTG
 
                     ldx       #$FFFF
 _2@@                dex
@@ -1287,7 +1274,7 @@ _2@@                dex
                     lda       #$20                ; Low Bite APL (Virtual Screen)
                     jsr       LCD_Data
                     lda       #$00                ; High Bite APL (Virtual Screen)
-                    bsr       LCD_Data
+                    jsr       LCD_Data
           ;-------------------------------------- ; Scroll Settings
                     lda       #$44                ; Set Scroll Command
                     bsr       LCD_Command
@@ -1367,29 +1354,34 @@ _3@@                clra
 ; bit4 - A0
 
 LCD_Command         proc
+                    pshx
                     pshb
-                    bset      PORTG,BIT_4         ; Set A0
+                    ldx       #REGS
+                    bset      [PORTG,x,BIT_4      ; Set A0
                     sta       PORTH               ; Write Command
-                    bset      PORTG,BIT_1         ; Read disabled
-                    bclr      PORTG,BIT_3         ; CS enabled
-                    bclr      PORTG,BIT_2         ; Write enabled
+                    bset      [PORTG,x,BIT_1      ; Read disabled
+                    bclr      [PORTG,x,BIT_3      ; CS enabled
+                    bclr      [PORTG,x,BIT_2      ; Write enabled
                     ldb       #$FF
                     stb       PORTG               ; Restore PG
                     pulb
+                    pulx
                     rts
 
 ;*******************************************************************************
 
 LCD_Data            proc
-                    pshb
-                    bclr      PORTG,BIT_4         ; Clear A0
+                    pshx
+                    bclr      [PORTG,x,BIT_4      ; Clear A0
                     sta       PORTH               ; Write Data
-                    bset      PORTG,BIT_1         ; Read disabled
-                    bclr      PORTG,BIT_3         ; CS enabled
-                    bclr      PORTG,BIT_2         ; Write enabled
-                    ldb       #$FF
-                    stb       PORTG               ; Restore PG
-                    pulb
+                    bset      [PORTG,x,BIT_1      ; Read disabled
+                    bclr      [PORTG,x,BIT_3      ; CS enabled
+                    bclr      [PORTG,x,BIT_2      ; Write enabled
+                    psha
+                    lda       #$FF
+                    sta       PORTG               ; Restore PG
+                    pula
+                    pulx
                     rts
 
 ;*******************************************************************************

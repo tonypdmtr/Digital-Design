@@ -1,7 +1,10 @@
-PORTG               equ       $0828               ; Expanded Address of Command
-DDRG                equ       $082A
-PORTH               equ       $0829               ; Expanded Address of Data
-DDRH                equ       $082B
+BUS_KHZ             def       2000
+
+REGS                equ       $0800
+PORTG               equ       REGS+$28            ; Expanded Address of Command
+DDRG                equ       REGS+$2A
+PORTH               equ       REGS+$29            ; Expanded Address of Data
+DDRH                equ       REGS+$2B
 
 BIT_0               equ       1                   ; /RESET
 BIT_1               equ       2                   ; /READ
@@ -25,9 +28,8 @@ SOME_VALUE          def       0
 MEM_WRITE           equ       $42
 
 ;*******************************************************************************
-                    #ROM
+                    #ROM      $1000
 ;*******************************************************************************
-                    org       $1000
 
 Start               proc
                     jsr       LCD_INIT
@@ -37,20 +39,18 @@ Start               proc
 ; Init Cursor Pointers to starting position (void)
 
 InitCurPointers     proc
-                    pshd
-                    ldd       cursor_init
-                    std       c_pointer
-                    std       cs_pointer
-                    puld
+                    pshx
+                    ldx       cursor_init
+                    stx       c_pointer
+                    stx       cs_pointer
+                    pulx
                     rts
 
 ;*******************************************************************************
 ; Draws Shape based on values in memory (void)
 
 DrawShape           proc
-                    pshd
-                    pshx
-                    pshy
+                    push
                     bsr       ClearShape
                     ldd       cursor_init
                     addd      .stage_block
@@ -65,9 +65,7 @@ DrawShape           proc
 Loop@@              lda       1,x
                     dex
                     ldd       c_pointer
-                    xgdx
-                    dex
-                    xgdx
+                    decd
                     bsr       UpdateCursor
                     ldy       #8
 _@@                 lsla
@@ -77,18 +75,14 @@ _@@                 lsla
           ;-------------------------------------- ; Check
                     cmpx      #SOME_VALUE
                     bne       Loop@@
-                    puly
-                    pulx
-                    puld
+                    pull
                     rts
 
 ;*******************************************************************************
 ; Clears old shape based on cs_pointer which has old cursor position (void)
 
 ClearShape          proc
-                    pshd
-                    pshx
-                    pshy
+                    push
                     ldd       cc_pointer
                     bsr       UpdateCursor        ; Set Cursor to start of shape
                     ldy       #4
@@ -96,36 +90,19 @@ ClearShape          proc
                     jsr       LCD_Command
                     clra
 Loop@@              ldx       #78
-_1@@                jsr       LCD_Data
+_1@@                bsr       ?LCD_Data
                     dex
                     bne       _1@@
                     dey
                     beq       Done@@
           ;--------------------------------------
                     ldd       cc_pointer
-                    xgdx
-                    dex
-                    xgdx
+                    decd
                     std       cc_pointer
                     bsr       UpdateCursor
                     bra       Loop@@
           ;--------------------------------------
-Done@@              puly
-                    pulx
-                    puld
-                    rts
-
-;*******************************************************************************
-; Requires D have cursor position (D)
-
-UpdateCursor        proc
-                    pshd
-                    lda       #$46
-                    jsr       LCD_Command
-                    puld
-                    jsr       LCD_Data
-                    tba
-                    jsr       LCD_Data
+Done@@              pull
                     rts
 
 ;*******************************************************************************
@@ -137,54 +114,75 @@ Square              proc
                     ldd       c_pointer
                     bsr       UpdateCursor
                     ldx       #8
-Loop@@             lda       #$FF
-                    jsr       LCD_Data
+                    lda       #$FF
+Loop@@              bsr       ?LCD_Data
                     dex
                     bne       Loop@@
                     clra
-                    jsr:2     LCD_Data
+                    bsr:2     ?LCD_Data
                     pulx
                     pula
                     rts
+
+;*******************************************************************************
+                              #Cycles
+?Delay_3ms          proc
+                    pshx
+                    ldx       #DELAY@@            ;WAS: $FFFF
+                              #Cycles
+Loop@@              dex
+                    bne       Loop@@
+                              #temp :cycles
+                    pulx
+                    rts
+
+DELAY@@             equ       3*BUS_KHZ-:cycles-:ocycles/:temp
+
+;*******************************************************************************
+; Requires D have cursor position (D)
+
+UpdateCursor        proc
+                    psha
+                    lda       #$46
+                    jsr       LCD_Command
+                    pula
+                    bsr       ?LCD_Data
+                    tba
+?LCD_Data           jmp       LCD_Data
 
 ;*******************************************************************************
 
 LCD_INIT            proc
                     psha
                     pshx
+                    ldx       #REGS
 
                     lda       #$FF
-                    sta       DDRG
-                    sta       DDRH
+                    sta       [DDRG,x
+                    sta       [DDRH,x
 
                     lda       #$1F
-                    sta       PORTG               ; Init PORTG
+                    sta       [PORTG,x            ; Init PORTG
 
-                    bclr      PORTG,BIT_0         ; RESET LOW
-          ;-------------------------------------- ; Need 3ms Delay
-                    ldx       #$FFFF
-_1@@                dex
-                    bne       _1@@
+                    bclr      [PORTG,x,BIT_0      ; RESET LOW
+                    bsr       ?Delay_3ms
 
-                    bset      PORTG,BIT_0         ; Reset Complete PORTG
-
-                    ldx       #$FFFF
-_2@@                dex
-                    bne       _2@@
+                    bset      [PORTG,x,BIT_0      ; Reset Complete PORTG
+                    bsr       ?Delay_3ms
 
                     lda       #$58                ; Turn off Display
-                    jsr       LCD_Command
+                    bsr       LCD_Command
           ;-------------------------------------- ; Init Setup
                     lda       #$40
                     bsr       LCD_Command
                     lda       #$30
-                    jsr       LCD_Data
+                    bsr       ?LCD_Data
                     lda       #$87                ; 8-2 frame AC Drive 7 - Char Width FX
-                    jsr       LCD_Data
+                    bsr       LCD_Data
                     lda       #$07                ; Char Height FY
-                    jsr       LCD_Data
+                    bsr       LCD_Data
                     lda       #$1F                ; 32 Diplay bites per line
-                    jsr       LCD_Data
+                    bsr       LCD_Data
                     lda       #$23                ; Total addr range per line TC/R (C/R+4 H-Blanking)
                     bsr       LCD_Data
                     lda       #$7F                ; 128 diplay lines L/F
@@ -197,9 +195,7 @@ _2@@                dex
                     lda       #$44                ; Set Scroll Command
                     bsr       LCD_Command
                     clra                          ; Layer 1 Start Address
-                    bsr       LCD_Data            ; Lower byte
-                    clra
-                    bsr       LCD_Data            ; High byte
+                    bsr:2     LCD_Data            ; Lower byte and High byte
                     lda       #$7F
                     bsr       LCD_Data            ; 128 lines
                     clra                          ; Layer 2 Start Address
@@ -231,16 +227,14 @@ _2@@                dex
                     lda       #$46
                     bsr       LCD_Command         ; Set Cursor
                     clra
-                    bsr       LCD_Data            ; to 0000h
-                    clra
-                    bsr       LCD_Data
+                    bsr:2     LCD_Data            ; to 0000h
           ;-------------------------------------- ; Clear Memeory
                     clrx
                     lda       #$42
                     bsr       LCD_Command
 
-Loop@@              clra                          ; Zero
-                    bsr       LCD_Data
+                    clra                          ; Zero
+Loop@@              bsr       LCD_Data
                     inx
                     cpx       #$3000
                     bne       Loop@@
@@ -250,12 +244,14 @@ Loop@@              clra                          ; Zero
                     lda       #%01010100          ; Layer 1,2 on layer 3,4, curser off
                     bsr       LCD_Data
           ;-------------------------------------- ; Set CGRAM
-;                   lda       #$5C
-;                   jsr       LCD_Command
-;                   clra
-;                   jsr       LCD_Data
-;                   lda       #$04
-;                   jsr       LCD_Data
+          #ifdef
+                    lda       #$5C
+                    bsr       LCD_Command
+                    clra
+                    bsr       LCD_Data
+                    lda       #$04
+                    bsr       LCD_Data
+          #endif
           ;--------------------------------------
                     pulx
                     pula
@@ -270,27 +266,32 @@ Loop@@              clra                          ; Zero
 ; bit4 - A0
 
 LCD_Command         proc
-                    pshb
-                    bset      PORTG,BIT_4         ; Set A0
-                    sta       PORTH               ; Write Command
-                    bset      PORTG,BIT_1         ; Read disabled
-                    bclr      PORTG,BIT_3         ; CS enabled
-                    bclr      PORTG,BIT_2         ; Write enabled
-                    ldb       #$FF
-                    stb       PORTG               ; Restore PG
-                    pulb
+                    pshx
+                    ldx       #REGS
+                    bset      [PORTG,x,BIT_4      ; Set A0
+                    bsr       ?LCD_Common
+                    pulx
                     rts
 
 ;*******************************************************************************
 
 LCD_Data            proc
-                    pshb
-                    bclr      PORTG,BIT_4         ; Clear A0
-                    sta       PORTH               ; Write Data
-                    bset      PORTG,BIT_1         ; Read disabled
-                    bclr      PORTG,BIT_3         ; CS enabled
-                    bclr      PORTG,BIT_2         ; Write enabled
-                    ldb       #$FF
-                    stb       PORTG               ; Restore PG
-                    pulb
+                    pshx
+                    ldx       #REGS
+                    bclr      [PORTG,x,BIT_4      ; Clear A0
+                    bsr       ?LCD_Common
+                    pulx
+                    rts
+
+;*******************************************************************************
+
+?LCD_Common         proc
+                    sta       [PORTH,x            ; Write Command/Data
+                    bset      [PORTG,x,BIT_1      ; Read disabled
+                    bclr      [PORTG,x,BIT_3      ; CS enabled
+                    bclr      [PORTG,x,BIT_2      ; Write enabled
+                    psha
+                    lda       #$FF
+                    sta       [PORTG,x            ; Restore PG
+                    pula
                     rts

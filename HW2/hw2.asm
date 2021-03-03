@@ -1,3 +1,4 @@
+BUS_KHZ             def       2000
           ;-------------------------------------- ; Here are our external devices
 LIGHTS1             equ       $B580
 LIGHTS2             equ       $B590
@@ -43,7 +44,7 @@ Start               proc
                     lda       COPOPT              ; Set COP to ~ 1s timeout
                     ora       #$03
                     sta       COPOPT
-                    jsr       resetCOP
+                    jsr       ResetCOP
 ;                   bra       gotoState1          ; start with state 1
 
 ;*******************************************************************************
@@ -53,8 +54,8 @@ gotoState1          proc
                     sta       LIGHTS1             ; and store into the light ext device
                     lda       #STATE12
                     sta       LIGHTS2
-                    jsr       delay10             ; then delay for 10 seconds before changing
-Loop@@              jsr       resetCOP            ; reset the COP
+                    jsr       delay10s            ; then delay for 10 seconds before changing
+Loop@@              jsr       ResetCOP            ; reset the COP
                     lda       SWITCHES            ; read Switches in
                     ldb       SWITCHES
                     andb      #$01                ; Switch A -> State 2
@@ -72,7 +73,7 @@ trans13             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE132
                     sta       LIGHTS2
-                    jsr       delay2
+                    jsr       delay2s
                     bra       gotoState3
 
 ;*******************************************************************************
@@ -83,19 +84,19 @@ trans12             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE122
                     sta       LIGHTS2
-                    jsr       delay2              ; wait for 2 seconds
-;                   bra       gotoState2
+                    jsr       delay2s             ; wait for 2 seconds
+;                   bra       GotoState2
 
 ;*******************************************************************************
 ; See State 1 for comments, same thing is happening
 
-gotoState2          proc
+GotoState2          proc
                     lda       #STATE21
                     sta       LIGHTS1
                     lda       #STATE22
                     sta       LIGHTS2
-                    jsr       delay10
-Loop@@              bsr       resetCOP
+                    bsr       delay10s
+Loop@@              bsr       ResetCOP
                     lda       SWITCHES
                     ldb       SWITCHES
                     andb      #$08                ; Switch D -> State 3
@@ -116,7 +117,7 @@ trans23             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE232
                     sta       LIGHTS2
-                    bsr       delay2
+                    bsr       delay2s
                     bra       gotoState3
 
 ;*******************************************************************************
@@ -127,7 +128,7 @@ trans21             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE212
                     sta       LIGHTS2
-                    bsr       delay2
+                    bsr       delay2s
                     bra       gotoState1
 
 ;*******************************************************************************
@@ -138,8 +139,8 @@ gotoState3          proc
                     sta       LIGHTS1
                     lda       #STATE32
                     sta       LIGHTS2
-                    bsr       delay10
-Loop@@              bsr       resetCOP
+                    bsr       delay10s
+Loop@@              bsr       ResetCOP
                     lda       SWITCHES
                     ldb       SWITCHES
                     andb      #$01                ; Switch A -> State 2
@@ -157,7 +158,7 @@ trans31             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE312
                     sta       LIGHTS2
-                    bsr       delay2
+                    bsr       delay2s
                     jmp       gotoState1
 
 ;*******************************************************************************
@@ -168,13 +169,13 @@ trans32             proc
                     sta       LIGHTS1
                     lda       #TRANSTATE322
                     sta       LIGHTS2
-                    bsr       delay2
-                    bra       gotoState2
+                    bsr       delay2s
+                    bra       GotoState2
 
 ;*******************************************************************************
 ; subroutine to reset the COP timer. We're doing this periodically
 
-resetCOP            proc
+ResetCOP            proc
                     psha
                     lda       #$55
                     sta       COPRST
@@ -184,58 +185,63 @@ resetCOP            proc
                     rts
 
 ;*******************************************************************************
-; 2 second delay
-
-delay2              proc
-                    psha
-                    lda       #10                 ; 5*2
-Loop@@              tsta
-                    beq       Done@@
-                    bsr       delay_small
-                    deca
-                    bra       Loop@@
-Done@@              pula
-                    rts
-
-;*******************************************************************************
 ; 10 second delay
 
-delay10             proc
+delay10s            proc
                     psha
-                    lda       #50                 ; 5*10
-Loop@@              cmpa      #0
-                    beq       Done@@
-                    bsr       delay_small
-                    deca
-                    bra       Loop@@
-Done@@              pula
+                    lda       #50                 ; 200ms*5*10
+                    bsr       ?DelayLoop
+                    pula
                     rts
 
 ;*******************************************************************************
-; a small delay of 0.19 seconds, used as a building block for the other delays
+; 2 second delay
 
-delay_small         proc
+delay2s             proc
+                    psha
+                    lda       #10                 ; 5*2
+                    bsr       ?DelayLoop
+                    pula
+                    rts
+
+;*******************************************************************************
+
+?DelayLoop          proc
+Loop@@              beq       Done@@
+                    bsr       delay_200ms
+                    deca
+                    bra       Loop@@
+Done@@              equ       :AnRTS
+
+;*******************************************************************************
+; A small delay of 0.s seconds, used as a building block for the other delays
+                              #Cycles
+delay_200ms         proc
                     pshx
-                    ldx       #31207
+                    ldx       #DELAY@@
+                              #Cycles
 Loop@@              cpx       #0
                     beq       Done@@
                     dex
                     bra       Loop@@
+                              #temp :cycles
 Done@@              pulx
                     rts
+
+DELAY@@             equ       200*BUS_KHZ-:cycles-:ocycles/:temp
 
 ;*******************************************************************************
 ; ISR to flash red lights on COP error
 
-COPAlert            proc
+COP_Handler         proc
 Loop@@              clra
                     sta       LIGHTS1
                     sta       LIGHTS2
-                    bsr       delay2
+                    bsr       delay2s
                     lda       #$24
                     sta       LIGHTS1
                     sta       LIGHTS2
-                    bsr       delay2
+                    bsr       delay2s
                     bra       Loop@@
 
 ;*******************************************************************************
@@ -243,7 +249,7 @@ Loop@@              clra
 ;*******************************************************************************
 
                     org       $FFFA
-                    fdb       COPAlert
+                    fdb       COP_Handler
 
                     org       $FFFE
                     fdb       Start
